@@ -1,0 +1,45 @@
+name: Deploy go finance
+
+on:
+  push:
+    branches: ["main"]  # triggers on push to main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Install Cloudflared
+      - name: Install cloudflared
+        run: |
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
+      # 3️⃣ Start Cloudflare SSH tunnel
+      - name: Start Cloudflare SSH tunnel
+        run: |
+          cloudflared access ssh --hostname ssh.kopiscript.com --url ssh://localhost:22 &
+          sleep 5
+
+      # 4️⃣ Configure SSH key
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      # 5️⃣ Deploy Vite app using PM2
+      - name: Deploy gofinance
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 azp@localhost \
+          "cd ~/home/azp/gofinance && git pull && npm install && npm run build && pm2 restart gofinance || pm2 start npx --name gofinance -- serve -s dist -l 5173"
+
+      # 6️⃣ Save PM2 process list
+      - name: Save PM2 processes
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 $SERVER_USER@$SERVER_HOST pm2 save
+
