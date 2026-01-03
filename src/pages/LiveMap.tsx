@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -18,7 +18,6 @@ interface DeviceLocation {
 }
 
 const LiveDeviceMap = () => {
-  const [allLocations, setAllLocations] = useState<DeviceLocation[]>([]);
   const [latestLocations, setLatestLocations] = useState<DeviceLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [deviceAliases, setDeviceAliases] = useState<Record<string, string>>({});
@@ -44,7 +43,6 @@ const LiveDeviceMap = () => {
         return;
       }
 
-      setAllLocations(data); // full dataset for trails
 
       // Build latest location per device
       const latestMap = new Map<string, DeviceLocation>();
@@ -102,12 +100,6 @@ const LiveDeviceMap = () => {
     setAliasEdits({ ...aliasEdits, [deviceId]: "" });
   };
 
-  // Build trails per device using allLocations
-  const trails: Record<string, [number, number][]> = {};
-  allLocations.forEach((loc) => {
-    if (!trails[loc.device_id]) trails[loc.device_id] = [];
-    trails[loc.device_id].push([loc.latitude, loc.longitude]);
-  });
 // Responsive icon size
 const isMobile = window.innerWidth < 460; // mobile check
 
@@ -131,10 +123,6 @@ const iconAnchor: [number, number] = isMobile ? [12, 20] : [20, 35];
           attribution="&copy; OpenStreetMap contributors"
         />
 
-        {/* Draw trails */}
-        {Object.entries(trails).map(([deviceId, coords]) => (
-          <Polyline key={`trail-${deviceId}`} positions={coords} color="blue" weight={3} />
-        ))}
 
         {/* Latest location markers */}
         {latestLocations.map((loc) => (
