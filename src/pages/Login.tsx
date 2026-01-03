@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogIn, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
 
 // --- Constants (Unchanged) ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;

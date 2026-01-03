@@ -1,6 +1,6 @@
 import { useEffect, useState, MouseEventHandler, useCallback } from "react";
 import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock } from 'lucide-react';
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -287,6 +287,7 @@ export default function ApprovedReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'Pending' | 'Approved'>('Pending');
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
@@ -364,30 +365,59 @@ export default function ApprovedReportsPage() {
             <p className="text-xl text-gray-500">No reports found.</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
+             {/* Tab Navigation */}
+             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-1 mb-6">
+              {[
+                { key: 'Pending', label: 'Pending Reports', count: pendingReports.length, color: 'text-yellow-600', border: 'border-yellow-500' },
+                { key: 'Approved', label: 'Approved Reports', count: approvedReports.length, color: 'text-green-600', border: 'border-green-500' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as any)}
+                  className={`
+                    px-6 py-3 rounded-t-lg font-bold text-sm transition-all duration-200 flex items-center gap-2 border-b-2
+                    ${activeTab === tab.key 
+                      ? `bg-white ${tab.color} ${tab.border} shadow-sm -mb-[2px]` 
+                      : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100 hover:text-gray-700'}
+                  `}
+                >
+                  {tab.label}
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.key ? 'bg-gray-100' : 'bg-gray-200'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
             {/* Pending Reports Section */}
-            {pendingReports.length > 0 && (
-              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: "#f59e0b" }}>
-                <h2 className="text-2xl font-bold mb-5" style={{ color: "#f59e0b" }}>
-                  Pending Reports ({pendingReports.length})
-                </h2>
-                <div className="space-y-4">
-                  {pendingReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                </div>
+            {activeTab === 'Pending' && (
+              <div className="p-6">
+                 {pendingReports.length === 0 ? (
+                    <p className="text-gray-500 italic">No pending reports.</p>
+                 ) : (
+                  <div className="space-y-4">
+                    {pendingReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  </div>
+                 )}
               </div>
             )}
 
             {/* Approved Reports Section */}
-            {approvedReports.length > 0 && (
-              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: "#10b981" }}>
-                <h2 className="text-2xl font-bold mb-5" style={{ color: "#10b981" }}>
-                  Approved Reports ({approvedReports.length})
-                </h2>
-                <div className="space-y-4">
-                  {approvedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                </div>
+            {activeTab === 'Approved' && (
+              <div className="p-6">
+                 {approvedReports.length === 0 ? (
+                    <p className="text-gray-500 italic">No approved reports.</p>
+                 ) : (
+                  <div className="space-y-4">
+                    {approvedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  </div>
+                 )}
               </div>
             )}
+            </div>
           </div>
         )}
       </div>

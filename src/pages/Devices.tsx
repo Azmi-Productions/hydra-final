@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
 import { ClockIcon, ComputerDesktopIcon, MapPinIcon, WifiIcon, XCircleIcon } from "@heroicons/react/24/solid";
 
 // --- Supabase REST API Config ---

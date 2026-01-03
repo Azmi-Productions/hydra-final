@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Trash2, Loader2, UserPlus, Calendar, Fingerprint } from "lucide-react";
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const TABLE_NAME = "adiav";
