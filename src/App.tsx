@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ReportSubmissionPage from "./pages/ReportSubmission"; 
+import ReportSubmissionPage from "./pages/ReportSubmission";
 import ReportsListPage from "./pages/ReportsPage";
+import ApprovedReportsPage from "./pages/ApprovedReports";
 import UserManagementPage from "./pages/UserManage";
 import Sidebar from "./components/Sidebar.tsx";
 import LiveDeviceMap from "./pages/LiveMap.tsx";
@@ -74,6 +75,17 @@ function AppWrapper() {
               </ProtectedRoute>
             }
           />
+
+          {/* Approved Reports (All roles) */}
+          <Route
+            path="/approved-reports"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor"]}>
+                <ApprovedReportsPage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/live-map"
             element={
