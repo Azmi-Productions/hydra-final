@@ -1,5 +1,5 @@
 import { useState, ChangeEvent, useEffect } from "react";
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
 import { MapPin, Calendar, Briefcase, Camera, X, Trash2 } from 'lucide-react';
 
 // --- Supabase REST API ---
@@ -271,7 +271,7 @@ export default function ReportSubmissionPage() {
   if (!res.ok) {
     const err = await res.json();
     console.error(err);
-    toast.error("Failed to start activity. Check console.");
+    toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
     return;
   }
 
@@ -307,9 +307,16 @@ export default function ReportSubmissionPage() {
 
 const handleSubmit = async () => {
   if (!selectedActivity) {
-    toast("Select a started activity first.");
+    toast.error("Select a started activity first.");
     return;
   }
+
+  // --- Validation: Enforce all fields ---
+  if (!damageType || !remarks || !date || !startTime) {
+      toast.error("Please fill in all required fields (Damage Type, Remarks).");
+      return;
+  }
+  // Simplified check for now - can be more granular if needed
 
   // --- Upload photos first ---
   let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
@@ -330,7 +337,7 @@ const handleSubmit = async () => {
       if (!uploadRes.ok) {
         const text = await uploadRes.text();
         console.error("Upload error:", text);
-        toast.error("Failed to upload a photo. Check console.");
+        toast.error(`Upload Failed: ${text.substring(0, 50)}...`);
         return;
       }
 
@@ -410,7 +417,7 @@ const handleSubmit = async () => {
   if (!res.ok) {
     const err = await res.json();
     console.error(err);
-    toast.error("Failed to submit report. Check console.");
+    toast.error(`Submit Failed: ${err.message || err.details || err.hint || "Unknown error"}`);
     return;
   }
 

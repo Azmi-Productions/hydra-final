@@ -110,17 +110,6 @@ function App() {
         position="top-center"
         reverseOrder={false}
         containerStyle={{ zIndex: 99999, top: 40 }}
-        toastOptions={{
-          style: {
-            fontSize: '18px',
-            padding: '16px 24px',
-            maxWidth: '500px',
-            width: 'fit-content',
-            borderRadius: '12px',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            fontWeight: 600,
-          },
-        }}
       />
     <Router>
       <AppWrapper />
