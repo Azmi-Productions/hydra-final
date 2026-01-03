@@ -12,10 +12,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Clock, Activity, Layers, CheckCircle, Users, LucideIcon } from "lucide-react"; // Import LucideIcon
+import { Clock, Activity, Layers, CheckCircle, Users, LucideIcon, TrendingUp } from "lucide-react";
+import { colors, spacing, typography, borderRadius, shadows } from '../designTokens';
 
 // --- Supabase REST API Config ---
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL; 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const REPORT_TABLE = "reports";
 
@@ -186,13 +187,35 @@ export default function Dashboard() {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div
+        className="flex items-center justify-center min-h-screen"
+        style={{ backgroundColor: colors.background.offWhite }}
+      >
         <div className="text-center">
-            <svg className="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg
+              className="animate-spin mx-auto"
+              style={{
+                width: spacing[8],
+                height: spacing[8],
+                color: colors.accent.mutedBlue
+              }}
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="text-lg font-medium text-slate-600 mt-3">Fetching Reports...</p>
+            <p
+              style={{
+                fontSize: typography.fontSize.lg,
+                fontWeight: typography.fontWeight.medium,
+                color: colors.neutral.gray600,
+                marginTop: spacing[3]
+              }}
+            >
+              Loading overview data...
+            </p>
         </div>
       </div>
     );
@@ -200,195 +223,439 @@ export default function Dashboard() {
   // Helper component for the summary cards - NOW TYPE-SAFE
   const StatCard = ({ icon: Icon, label, value, color, description, onClick }: StatCardProps) => (
     <div
-      className={`bg-white p-6 rounded-2xl shadow-lg border-t-4 ${onClick ? 'cursor-pointer hover:shadow-xl transition-shadow duration-200' : ''}`}
-      style={{ borderColor: color }}
+      className={`bg-white rounded-xl ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow duration-200' : ''}`}
+      style={{
+        padding: spacing[6],
+        boxShadow: shadows.base,
+        border: `1px solid ${colors.neutral.gray200}`,
+        borderTop: `4px solid ${color}`,
+        borderRadius: borderRadius.xl
+      }}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-sm font-medium text-slate-500 tracking-wider uppercase">{label}</p>
-          <p className="text-4xl font-extrabold text-slate-900 mt-2">{value}</p>
+          <p
+            style={{
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium,
+              color: colors.neutral.gray500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}
+          >
+            {label}
+          </p>
+          <p
+            style={{
+              fontSize: typography.fontSize['4xl'],
+              fontWeight: typography.fontWeight.bold,
+              color: colors.text.charcoal,
+              marginTop: spacing[2]
+            }}
+          >
+            {value}
+          </p>
         </div>
-        <div className="p-3 rounded-full bg-slate-100" style={{ color: color }}>
-          <Icon className="w-6 h-6" />
+        <div
+          style={{
+            padding: spacing[3],
+            borderRadius: borderRadius.full,
+            backgroundColor: colors.neutral.gray100,
+            color: color
+          }}
+        >
+          <Icon style={{ width: spacing[6], height: spacing[6] }} />
         </div>
       </div>
-      <p className="text-xs text-slate-400 mt-3 border-t pt-2">{description}</p>
+      <p
+        style={{
+          fontSize: typography.fontSize.xs,
+          color: colors.neutral.gray400,
+          marginTop: spacing[3],
+          paddingTop: spacing[2],
+          borderTop: `1px solid ${colors.neutral.gray200}`
+        }}
+      >
+        {description}
+      </p>
     </div>
   );
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen font-sans">
-      <header className="mb-12 border-b pb-4">
-        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight flex items-center">
-          <Layers className="w-8 h-8 mr-3 text-indigo-600"/>
-          Operations Dashboard
-        </h1>
-        <p className="text-slate-500 mt-1 text-lg">
-          Key metrics for maintenance and damage response.
-        </p>
-      </header>
-
-      {/* Summary Cards - Type-safe props passed here */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
-        <StatCard
-          icon={Activity}
-          label="Total Reports"
-          value={totalReports.toString()} // Ensure value is a string
-          color={BOLD_COLORS.primary}
-          description="Total maintenance activities logged."
-        />
-        <StatCard
-          icon={Clock}
-          label="Total Duration"
-          value={totalDuration.toFixed(1) + ' hrs'}
-          color={BOLD_COLORS.secondary}
-          description="Cumulative man-hours spent on repairs."
-        />
-        <StatCard
-          icon={Users}
-          label="Total Working Hours"
-          value={totalSupervisors.toString()}
-          color="#A855F7"
-          description="Active supervisors with working hours. Click to view details."
-          onClick={() => setShowWorkingHoursModal(true)}
-        />
-        <StatCard
-          icon={Layers}
-          label="Avg. Repair Time"
-          value={averageDuration.toFixed(1) + ' hrs'}
-          color={BOLD_COLORS.tertiary}
-          description="Average time per reported incident."
-        />
-        <StatCard
-          icon={CheckCircle}
-          label="Total Materials"
-          value={materialData.reduce((sum, m) => sum + m.value, 0).toFixed(0)}
-          color={BOLD_COLORS.accent}
-          description="Total volume/units of resources consumed."
-        />
+    <div
+      className="min-h-screen"
+      style={{
+        backgroundColor: colors.background.offWhite,
+        fontFamily: typography.fontFamily.primary
+      }}
+    >
+      {/* Header */}
+      <div
+        className="border-b"
+        style={{
+          padding: `${spacing[8]} ${spacing[8]} ${spacing[6]} ${spacing[8]}`,
+          borderColor: colors.neutral.gray200,
+          backgroundColor: colors.neutral.gray50
+        }}
+      >
+        <div className="max-w-7xl mx-auto">
+          <h1
+            className="flex items-center"
+            style={{
+              fontSize: typography.fontSize['4xl'],
+              fontWeight: typography.fontWeight.bold,
+              color: colors.text.charcoal,
+              marginBottom: spacing[2]
+            }}
+          >
+            <TrendingUp
+              style={{
+                width: spacing[8],
+                height: spacing[8],
+                marginRight: spacing[3],
+                color: colors.accent.mutedBlue
+              }}
+            />
+            Overview
+          </h1>
+          <p
+            style={{
+              fontSize: typography.fontSize.lg,
+              color: colors.neutral.gray600,
+              margin: 0
+            }}
+          >
+            Monitor key performance metrics and operational insights
+          </p>
+        </div>
       </div>
 
-      {/* Charts - New Sleek Design */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Damage Type Pie Chart */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 lg:col-span-1 border border-slate-100">
-          <h2 className="text-xl font-bold mb-4 text-slate-800">
-            Damage Type Breakdown
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={damageTypeData}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={65} 
-                outerRadius={100}
-                paddingAngle={3}
-                stroke="none"
-              >
-                {damageTypeData.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip dataSuffix="reports"/>} />
-              <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ paddingLeft: '15px' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Main Content */}
+      <div style={{ padding: `${spacing[8]} ${spacing[8]}` }}>
+        <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* Status Distribution Pie Chart */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 lg:col-span-1 border border-slate-100">
-          <h2 className="text-xl font-bold mb-4 text-slate-800">
-            Report Status Distribution
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={statusData}
-                dataKey="value"
-                nameKey="name"
-                outerRadius={100}
-                paddingAngle={3}
-                stroke="none"
-              >
-                {statusData.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip dataSuffix="reports"/>} />
-              <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ paddingLeft: '15px' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Material Usage Bar Chart */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 lg:col-span-3 border border-slate-100 mt-6">
-          <h2 className="text-xl font-bold mb-4 text-slate-800">
-            Material Usage Breakdown (Units)
-          </h2>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={materialData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} stroke="#64748B" />
-              <YAxis stroke="#64748B" />
-              <Tooltip content={<CustomTooltip dataSuffix="units"/>} />
-              <Legend />
-              <Bar 
-                dataKey="value" 
-                fill={BOLD_COLORS.primary} 
-                barSize={40} 
-                radius={[5, 5, 0, 0]} 
-                name="Quantity Used"
+          {/* Key Metrics Section */}
+          <section>
+            <h2
+              style={{
+                fontSize: typography.fontSize.xl,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.text.charcoal,
+                marginBottom: spacing[6]
+              }}
+            >
+              Key Metrics
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard
+                icon={Activity}
+                label="Total Reports"
+                value={totalReports.toString()}
+                color={colors.accent.mutedBlue}
+                description="Total maintenance activities logged"
               />
-            </BarChart>
-          </ResponsiveContainer>
+              <StatCard
+                icon={Clock}
+                label="Total Hours"
+                value={totalDuration.toFixed(1) + ' hrs'}
+                color={colors.semantic.success}
+                description="Cumulative man-hours spent"
+              />
+              <StatCard
+                icon={Users}
+                label="Active Supervisors"
+                value={totalSupervisors.toString()}
+                color={colors.secondary.slateBlue}
+                description="Supervisors with working hours"
+                onClick={() => setShowWorkingHoursModal(true)}
+              />
+              <StatCard
+                icon={Layers}
+                label="Avg Repair Time"
+                value={averageDuration.toFixed(1) + ' hrs'}
+                color={colors.semantic.warning}
+                description="Average time per incident"
+              />
+            </div>
+          </section>
+
+          {/* Analytics Section */}
+          <section>
+            <h2
+              style={{
+                fontSize: typography.fontSize.xl,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.text.charcoal,
+                marginBottom: spacing[6]
+              }}
+            >
+              Analytics
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+              {/* Damage Type Analysis */}
+              <div
+                className="bg-white rounded-xl p-6"
+                style={{
+                  boxShadow: shadows.base,
+                  border: `1px solid ${colors.neutral.gray200}`
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: typography.fontSize.lg,
+                    fontWeight: typography.fontWeight.semibold,
+                    color: colors.text.charcoal,
+                    marginBottom: spacing[4]
+                  }}
+                >
+                  Damage Types
+                </h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={damageTypeData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {damageTypeData.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip dataSuffix="reports"/>} />
+                    <Legend
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      wrapperStyle={{ paddingTop: spacing[4] }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Status Distribution */}
+              <div
+                className="bg-white rounded-xl p-6"
+                style={{
+                  boxShadow: shadows.base,
+                  border: `1px solid ${colors.neutral.gray200}`
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: typography.fontSize.lg,
+                    fontWeight: typography.fontWeight.semibold,
+                    color: colors.text.charcoal,
+                    marginBottom: spacing[4]
+                  }}
+                >
+                  Report Status
+                </h3>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      dataKey="value"
+                      nameKey="name"
+                      outerRadius={80}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {statusData.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip dataSuffix="reports"/>} />
+                    <Legend
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      wrapperStyle={{ paddingTop: spacing[4] }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Material Usage Chart - Full Width */}
+            <div
+              className="bg-white rounded-xl p-6 mt-8"
+              style={{
+                boxShadow: shadows.base,
+                border: `1px solid ${colors.neutral.gray200}`
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: typography.fontSize.lg,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.text.charcoal,
+                  marginBottom: spacing[4]
+                }}
+              >
+                Material Usage Overview
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={materialData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    style={{ fill: colors.neutral.gray600 }}
+                  />
+                  <YAxis
+                    style={{ fill: colors.neutral.gray600 }}
+                  />
+                  <Tooltip content={<CustomTooltip dataSuffix="units"/>} />
+                  <Bar
+                    dataKey="value"
+                    fill={colors.accent.mutedBlue}
+                    radius={[4, 4, 0, 0]}
+                    name="Quantity Used"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
         </div>
       </div>
 
       {/* Working Hours Modal */}
       {showWorkingHoursModal && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
-                <Users className="w-6 h-6 mr-3 text-purple-600" />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{
+            backgroundColor: colors.overlay.modal
+          }}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            style={{
+              boxShadow: shadows['2xl'],
+              borderRadius: borderRadius['2xl']
+            }}
+          >
+            <div
+              className="sticky top-0 bg-white border-b flex justify-between items-center"
+              style={{
+                padding: spacing[6],
+                borderColor: colors.neutral.gray200,
+                borderRadius: `${borderRadius['2xl']} ${borderRadius['2xl']} 0 0`
+              }}
+            >
+              <h2
+                className="flex items-center"
+                style={{
+                  fontSize: typography.fontSize['2xl'],
+                  fontWeight: typography.fontWeight.bold,
+                  color: colors.text.charcoal
+                }}
+              >
+                <Users
+                  style={{
+                    width: spacing[6],
+                    height: spacing[6],
+                    marginRight: spacing[3],
+                    color: colors.secondary.slateBlue
+                  }}
+                />
                 Supervisor Working Hours
               </h2>
               <button
                 onClick={() => setShowWorkingHoursModal(false)}
-                className="text-gray-500 hover:text-gray-900 p-2 rounded-full transition hover:bg-gray-100"
+                className="rounded-full transition hover:bg-gray-100"
+                style={{
+                  color: colors.neutral.gray500,
+                  padding: spacing[2]
+                }}
                 aria-label="Close"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style={{ width: spacing[6], height: spacing[6] }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="mb-6">
-                <p className="text-gray-600 mb-4">
-                  Total active supervisors: <span className="font-semibold text-purple-600">{totalSupervisors}</span>
+            <div style={{ padding: spacing[6] }}>
+              <div style={{ marginBottom: spacing[6] }}>
+                <p
+                  style={{
+                    color: colors.neutral.gray600,
+                    marginBottom: spacing[4],
+                    fontSize: typography.fontSize.base
+                  }}
+                >
+                  Total active supervisors: <span
+                    style={{
+                      fontWeight: typography.fontWeight.semibold,
+                      color: colors.secondary.slateBlue
+                    }}
+                  >
+                    {totalSupervisors}
+                  </span>
                 </p>
                 <div className="space-y-3">
                   {Object.entries(supervisorHours)
                     .sort(([,a], [,b]) => b - a)
                     .map(([supervisor, hours]) => (
-                      <div key={supervisor} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div
+                        key={supervisor}
+                        className="flex justify-between items-center rounded-lg"
+                        style={{
+                          padding: spacing[4],
+                          backgroundColor: colors.neutral.gray50,
+                          border: `1px solid ${colors.neutral.gray200}`,
+                          borderRadius: borderRadius.lg
+                        }}
+                      >
                         <div className="flex items-center">
-                          <Users className="w-5 h-5 mr-3 text-purple-500" />
-                          <span className="font-medium text-gray-900">{supervisor}</span>
+                          <Users
+                            style={{
+                              width: spacing[5],
+                              height: spacing[5],
+                              marginRight: spacing[3],
+                              color: colors.secondary.slateBlue
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontWeight: typography.fontWeight.medium,
+                              color: colors.text.charcoal
+                            }}
+                          >
+                            {supervisor}
+                          </span>
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl font-bold text-purple-600">{hours.toFixed(1)}</span>
-                          <span className="text-sm text-gray-500 ml-1">hours</span>
+                          <span
+                            style={{
+                              fontSize: typography.fontSize['2xl'],
+                              fontWeight: typography.fontWeight.bold,
+                              color: colors.secondary.slateBlue
+                            }}
+                          >
+                            {hours.toFixed(1)}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: typography.fontSize.sm,
+                              color: colors.neutral.gray500,
+                              marginLeft: spacing[1]
+                            }}
+                          >
+                            hours
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -398,7 +665,22 @@ export default function Dashboard() {
               <div className="flex justify-end">
                 <button
                   onClick={() => setShowWorkingHoursModal(false)}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200 font-medium"
+                  style={{
+                    padding: `${spacing[2]} ${spacing[6]}`,
+                    backgroundColor: colors.secondary.slateBlue,
+                    color: colors.neutral.gray50,
+                    borderRadius: borderRadius.lg,
+                    fontWeight: typography.fontWeight.medium,
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.primary.navy;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.secondary.slateBlue;
+                  }}
                 >
                   Close
                 </button>

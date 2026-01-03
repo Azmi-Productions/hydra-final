@@ -366,24 +366,31 @@ export default function ApprovedReportsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-             {/* Tab Navigation */}
-             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-1 mb-6">
+             {/* Tab Navigation - Pill Style */}
+             <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide px-4 pt-2 pb-2">
               {[
-                { key: 'Pending', label: 'Pending Reports', count: pendingReports.length, color: 'text-yellow-600', border: 'border-yellow-500' },
-                { key: 'Approved', label: 'Approved Reports', count: approvedReports.length, color: 'text-green-600', border: 'border-green-500' },
+                { key: 'Pending', label: 'Pending Reports', shortLabel: 'Pending', count: pendingReports.length, bgColor: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-white' },
+                { key: 'Approved', label: 'Approved Reports', shortLabel: 'Approved', count: approvedReports.length, bgColor: 'bg-green-500', hoverColor: 'hover:bg-green-600', textColor: 'text-white' },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key as any)}
                   className={`
-                    px-6 py-3 rounded-t-lg font-bold text-sm transition-all duration-200 flex items-center gap-2 border-b-2
-                    ${activeTab === tab.key 
-                      ? `bg-white ${tab.color} ${tab.border} shadow-sm -mb-[2px]` 
-                      : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100 hover:text-gray-700'}
+                    px-2 sm:px-3 py-1.5 sm:py-2 rounded-full font-medium text-xs transition-all duration-200 flex items-center gap-1 sm:gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0
+                    ${activeTab === tab.key
+                      ? `${tab.bgColor} ${tab.textColor} scale-105 shadow-md ring-1 ring-offset-1`
+                      : `bg-slate-100 text-slate-600 ${tab.hoverColor} hover:text-white`}
                   `}
+                  style={activeTab === tab.key ? {
+                    '--tw-ring-color': tab.bgColor.replace('bg-', '').replace('-500', ''),
+                    '--tw-ring-opacity': '0.7'
+                  } as React.CSSProperties : {}}
                 >
-                  {tab.label}
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.key ? 'bg-gray-100' : 'bg-gray-200'}`}>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <span className={`px-1 py-0.5 rounded-full text-xs font-medium ${
+                    activeTab === tab.key ? 'bg-white bg-opacity-20 text-white' : 'bg-white text-slate-700'
+                  }`}>
                     {tab.count}
                   </span>
                 </button>
