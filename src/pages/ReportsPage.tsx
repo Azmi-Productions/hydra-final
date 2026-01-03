@@ -136,6 +136,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       const updatedData = await res.json(); // now safe to parse
 
       onUpdate(updatedData[0] || editableReport); 
+      toast.success("Changes saved successfully!");
       onClose();
     } catch (err) {
       console.error(err);
@@ -160,6 +161,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       
       const updatedData = await res.json();
       onUpdate(updatedData[0] || { ...editableReport, status });
+      toast.success(`Report ${status} successfully!`);
       onClose();
     } catch (err) {
       console.error(err);

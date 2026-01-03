@@ -206,6 +206,7 @@ export default function UserManagementPage() {
       });
       if (!res.ok) throw new Error("Failed to update role");
       setUsers((prevUsers) => prevUsers.map((user) => (user.id === id ? { ...user, role } : user)));
+      toast.success("User role updated!");
     } catch (err) {
       console.error(err);
       toast.error("Failed to update role.");
@@ -223,6 +224,7 @@ export default function UserManagementPage() {
       });
       if (!res.ok) throw new Error("Failed to delete user");
       setUsers((prevUsers) => prevUsers.filter((user) => user.id !== id));
+      toast.success("User deleted successfully!");
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete user.");
@@ -244,6 +246,7 @@ export default function UserManagementPage() {
       if (!res.ok) throw new Error("Failed to add user");
       setNewUser({ username: "", password: "", role: "supervisor" });
       await fetchUsers();
+      toast.success("User added successfully!");
     } catch (err) {
       console.error(err);
       toast.error("Failed to add user.");

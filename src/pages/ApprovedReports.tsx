@@ -322,6 +322,7 @@ export default function ApprovedReportsPage() {
         if (data.length) setRole(data[0].role);
       } catch (err) {
         console.error(err);
+        toast.error("Failed to fetch user role.");
       }
     };
     getUserRole();

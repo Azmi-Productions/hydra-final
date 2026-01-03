@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -40,6 +41,7 @@ const LiveDeviceMap = () => {
 
       if (!Array.isArray(data)) {
         console.error("Supabase returned an error:", data);
+        toast.error("Failed to load device locations.");
         return;
       }
 
@@ -62,8 +64,12 @@ const LiveDeviceMap = () => {
 
       setLatestLocations(Array.from(latestMap.values()));
       setDeviceAliases(aliasMap);
+      if (data.length > 0) {
+         // Optional: toast.success("Live map updated"); // Might be too spammy every 10s
+      }
     } catch (err) {
       console.error("Error fetching device locations:", err);
+      toast.error("Error fetching device locations.");
     } finally {
       setLoading(false);
     }
@@ -93,8 +99,11 @@ const LiveDeviceMap = () => {
 
     if (!res.ok) {
       console.error("Failed to save alias");
+      toast.error("Failed to save alias.");
       return;
     }
+
+    toast.success("Alias saved successfully!");
 
     setDeviceAliases({ ...deviceAliases, [deviceId]: newAlias });
     setAliasEdits({ ...aliasEdits, [deviceId]: "" });
