@@ -1,5 +1,5 @@
-import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState, MouseEventHandler, useCallback } from "react";
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock } from 'lucide-react';
 import toast from "react-hot-toast";
 
 // --- Supabase REST API Config from .env ---
@@ -67,6 +67,12 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
   const sectionHeaderStyle = "text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center";
   const iconStyle = "w-5 h-5 mr-2 text-indigo-500";
 
+  // Status badge style
+  const getStatusBadge = (status: string) => {
+    if (status === 'Approved') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-green-100 text-green-700";
+    if (status === 'Pending') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700";
+    return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-gray-100 text-gray-700";
+  };
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
@@ -76,7 +82,7 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
         <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center z-10">
           <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
             <FolderOpen className="w-6 h-6 mr-3 text-indigo-600" />
-            <span className="truncate">Approved Report: {report.activity_id}</span>
+            <span className="truncate">Report: {report.activity_id}</span>
           </h2>
           <button
             onClick={onClose}
@@ -92,7 +98,7 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
 
           {/* Status Badge */}
           <div className="flex justify-end">
-            <span className={`inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-green-100 text-green-700`}>
+            <span className={getStatusBadge(report.status)}>
               {report.status}
             </span>
           </div>
@@ -229,6 +235,13 @@ interface ListItemProps {
 }
 
 const ReportListItem = ({ report, onClick }: ListItemProps) => {
+  // Status badge style
+  const getStatusBadge = (status: string) => {
+    if (status === 'Approved') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-green-500 text-white";
+    if (status === 'Pending') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-yellow-500 text-white";
+    return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-gray-500 text-white";
+  };
+
   return (
     <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer
                     hover:shadow-2xl hover:border-indigo-400 transition duration-300
@@ -255,7 +268,7 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
           <span className="block text-xs font-normal text-gray-400">Duration</span>
           {report.duration} hours
         </p>
-        <span className="inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-green-500 text-white">
+        <span className={getStatusBadge(report.status)}>
           {report.status}
         </span>
       </div>
@@ -263,60 +276,7 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
   );
 };
 
-// ====================================================================
-// --- PAGINATION COMPONENT (MODERN ROUNDED PILLS, CENTERED) ---
-// ====================================================================
-const PaginationPills = ({
-  page,
-  total,
-  itemsPerPage,
-  onChange
-}: {
-  page: number;
-  total: number;
-  itemsPerPage: number;
-  onChange: (n: number) => void;
-}) => {
-  const totalPages = Math.ceil(total / itemsPerPage);
-  if (totalPages <= 1) return null;
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
-
-  return (
-    <div className="flex justify-center mt-4">
-      <div className="flex items-center gap-2">
-        <button
-          disabled={page === 1}
-          onClick={() => onChange(page - 1)}
-          className="px-3 py-1 rounded-full bg-gray-200 text-gray-700 disabled:opacity-40 hover:bg-gray-300 transition flex items-center"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-
-        {pageNumbers.map(num => (
-          <button
-            key={num}
-            onClick={() => onChange(num)}
-            className={`px-4 py-1 rounded-full text-sm font-semibold transition
-              ${page === num
-                ? "bg-indigo-600 text-white shadow"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-          >
-            {num}
-          </button>
-        ))}
-
-        <button
-          disabled={page === totalPages}
-          onClick={() => onChange(page + 1)}
-          className="px-3 py-1 rounded-full bg-gray-200 text-gray-700 disabled:opacity-40 hover:bg-gray-300 transition flex items-center"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ====================================================================
 // --- 3. ApprovedReportsPage Component (Main) ---
@@ -325,36 +285,59 @@ export default function ApprovedReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&status=eq.Approved&order=created_at.desc`, { headers });
-      if (!res.ok) throw new Error("Failed to fetch");
+      let query = `${supabaseUrl}/rest/v1/reports?select=*&status=in.(Approved,Pending)&order=status.asc,created_at.desc`;
+      if (role === 'supervisor' && username) {
+        query += `&submitted_by=eq.${username}`;
+      }
+      const res = await fetch(query, { headers });
+      if (!res.ok) throw new Error("Failed to fetch reports");
       const data: Report[] = await res.json();
       setReports(data);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to fetch approved reports");
+      toast.error("Failed to fetch reports");
     }
     setLoading(false);
-  };
+  }, [role, username]);
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => {
+    const getUserRole = async () => {
+      const cookie = document.cookie.split("; ").find(c => c.startsWith("username="));
+      if (!cookie) return;
+
+      const user = cookie.split("=")[1];
+      setUsername(user);
+      try {
+        const res = await fetch(
+          `${supabaseUrl}/rest/v1/adiav?username=eq.${user}&select=role`,
+          { headers }
+        );
+        const data = await res.json();
+        if (data.length) setRole(data[0].role);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    getUserRole();
+  }, []);
+
+  useEffect(() => {
+    if (role) {
+      fetchReports();
+    }
+  }, [role, fetchReports]);
 
   const handleReportClick = (report: Report) => setSelectedReport(report);
 
-  const itemsPerPage = 5; // Show more per page since it's read-only
-  const [page, setPage] = useState(1);
-
-  // Reset page to 1 when the list length changes
-  useEffect(() => { setPage(1); }, [reports.length]);
-
-  // Paginated slice
-  const paginatedReports = reports.slice(
-    (page - 1) * itemsPerPage,
-    page * itemsPerPage
-  );
+  // Separate reports by status
+  const pendingReports = reports.filter(r => r.status === 'Pending');
+  const approvedReports = reports.filter(r => r.status === 'Approved');
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
@@ -363,37 +346,47 @@ export default function ApprovedReportsPage() {
         {/* Header */}
         <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300">
           <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            Approved Reports
+            Report Status
           </h1>
           <p className="text-gray-500 mt-2 italic text-lg">
-            View all approved activity reports. Click any report for detailed information.
+            {role === 'supervisor' ? 'View your report status including pending and approved reports.' : 'View all reports status including pending and approved reports.'} Click any report for detailed information.
           </p>
         </header>
 
         {/* Loading / Empty State */}
         {loading ? (
           <div className="flex justify-center items-center py-20 text-indigo-600 bg-white rounded-xl shadow-md">
-            <Loader className="w-6 h-6 animate-spin mr-3" /> Fetching approved reports...
+            <Loader className="w-6 h-6 animate-spin mr-3" /> Fetching reports...
           </div>
         ) : reports.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl shadow-md border border-gray-100">
-            <p className="text-xl text-gray-500">No approved reports found.</p>
+            <p className="text-xl text-gray-500">No reports found.</p>
           </div>
         ) : (
-          /* Reports List */
-          <div className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: "#10b981" }}>
-            <h2 className="text-2xl font-bold mb-5" style={{ color: "#10b981" }}>
-              Approved Reports ({reports.length})
-            </h2>
-            <div className="space-y-4">
-              {paginatedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-            </div>
-            <PaginationPills
-              page={page}
-              total={reports.length}
-              itemsPerPage={itemsPerPage}
-              onChange={setPage}
-            />
+          <div className="space-y-8">
+            {/* Pending Reports Section */}
+            {pendingReports.length > 0 && (
+              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: "#f59e0b" }}>
+                <h2 className="text-2xl font-bold mb-5" style={{ color: "#f59e0b" }}>
+                  Pending Reports ({pendingReports.length})
+                </h2>
+                <div className="space-y-4">
+                  {pendingReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Approved Reports Section */}
+            {approvedReports.length > 0 && (
+              <div className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: "#10b981" }}>
+                <h2 className="text-2xl font-bold mb-5" style={{ color: "#10b981" }}>
+                  Approved Reports ({approvedReports.length})
+                </h2>
+                <div className="space-y-4">
+                  {approvedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
