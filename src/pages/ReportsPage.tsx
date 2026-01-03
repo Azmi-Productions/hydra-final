@@ -1,6 +1,7 @@
 import { useEffect, useState, MouseEventHandler } from "react";
 import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock } from 'lucide-react';
 import toast from "../utils/toast";
+import { supabase } from "../supabase";
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -500,7 +501,31 @@ export default function ReportsListPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => { 
+    fetchReports(); 
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reports',
+        },
+        (payload) => {
+          console.log('Change received!', payload);
+          toast.success("New data received! Refreshing...");
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleReportClick = (report: Report) => setSelectedReport(report);
 
