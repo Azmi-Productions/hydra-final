@@ -12,7 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Clock, Activity, Layers, CheckCircle, LucideIcon } from "lucide-react"; // Import LucideIcon
+import { Clock, Activity, Layers, CheckCircle, Users, LucideIcon } from "lucide-react"; // Import LucideIcon
 
 // --- Supabase REST API Config ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL; 
@@ -62,6 +62,7 @@ interface StatCardProps {
   value: string;
   color: string;
   description: string;
+  onClick?: () => void;
 }
 
 // New Modern Color Palette: Slate/Indigo for professionalism and energy
@@ -113,6 +114,7 @@ const CustomTooltip = ({ active, payload, dataSuffix = '' }: any) => {
 export default function Dashboard() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [showWorkingHoursModal, setShowWorkingHoursModal] = useState<boolean>(false);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -171,6 +173,17 @@ export default function Dashboard() {
     }, {})
   ).map(([name, value]) => ({ name, value }));
 
+  // Working hours per supervisor
+  const supervisorHours = reports.reduce((acc: Record<string, number>, r) => {
+    const duration = Number(r.duration);
+    if (!isNaN(duration) && r.submitted_by) {
+      acc[r.submitted_by] = (acc[r.submitted_by] || 0) + duration;
+    }
+    return acc;
+  }, {});
+
+  const totalSupervisors = Object.keys(supervisorHours).length;
+
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -185,9 +198,12 @@ export default function Dashboard() {
     );
 
   // Helper component for the summary cards - NOW TYPE-SAFE
-  const StatCard = ({ icon: Icon, label, value, color, description }: StatCardProps) => (
-    <div className="bg-white p-6 rounded-2xl shadow-lg border-t-4" 
-         style={{ borderColor: color }}>
+  const StatCard = ({ icon: Icon, label, value, color, description, onClick }: StatCardProps) => (
+    <div
+      className={`bg-white p-6 rounded-2xl shadow-lg border-t-4 ${onClick ? 'cursor-pointer hover:shadow-xl transition-shadow duration-200' : ''}`}
+      style={{ borderColor: color }}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start">
         <div>
           <p className="text-sm font-medium text-slate-500 tracking-wider uppercase">{label}</p>
@@ -214,7 +230,7 @@ export default function Dashboard() {
       </header>
 
       {/* Summary Cards - Type-safe props passed here */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
         <StatCard
           icon={Activity}
           label="Total Reports"
@@ -228,6 +244,14 @@ export default function Dashboard() {
           value={totalDuration.toFixed(1) + ' hrs'}
           color={BOLD_COLORS.secondary}
           description="Cumulative man-hours spent on repairs."
+        />
+        <StatCard
+          icon={Users}
+          label="Total Working Hours"
+          value={totalSupervisors.toString()}
+          color="#A855F7"
+          description="Active supervisors with working hours. Click to view details."
+          onClick={() => setShowWorkingHoursModal(true)}
         />
         <StatCard
           icon={Layers}
@@ -327,6 +351,62 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Working Hours Modal */}
+      {showWorkingHoursModal && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
+                <Users className="w-6 h-6 mr-3 text-purple-600" />
+                Supervisor Working Hours
+              </h2>
+              <button
+                onClick={() => setShowWorkingHoursModal(false)}
+                className="text-gray-500 hover:text-gray-900 p-2 rounded-full transition hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Total active supervisors: <span className="font-semibold text-purple-600">{totalSupervisors}</span>
+                </p>
+                <div className="space-y-3">
+                  {Object.entries(supervisorHours)
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([supervisor, hours]) => (
+                      <div key={supervisor} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center">
+                          <Users className="w-5 h-5 mr-3 text-purple-500" />
+                          <span className="font-medium text-gray-900">{supervisor}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-2xl font-bold text-purple-600">{hours.toFixed(1)}</span>
+                          <span className="text-sm text-gray-500 ml-1">hours</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowWorkingHoursModal(false)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition duration-200 font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
