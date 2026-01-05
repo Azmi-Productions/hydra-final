@@ -1,52 +1,17 @@
-import { useState, useEffect, FC } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogIn, Loader2 } from "lucide-react";
+import toast from "../utils/toast";
 
 // --- Constants (Unchanged) ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-type MessageType = "error" | "success" | "blue" | "";
-
-interface MessageState {
-  text: string;
-  type: MessageType;
-}
-
-// --- Message Component (Updated Colors for White Background) ---
-interface MessageProps {
-  message: MessageState;
-}
-
-const Message: FC<MessageProps> = ({ message }) => {
-  if (!message.text) return null;
-
-  const baseClasses =
-    "fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl transition-opacity duration-300 transform";
-  const typeClasses =
-    message.type === "error"
-      ? "bg-red-600 text-white"
-      : message.type === "success"
-      ? "bg-emerald-600 text-white"
-      : "bg-indigo-600 text-white";
-
-  return (
-    <div className={`${baseClasses} ${typeClasses}`}>
-      <p className="font-semibold">{message.text}</p>
-    </div>
-  );
-};
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<MessageState>({ text: "", type: "" });
   const navigate = useNavigate();
-
-  const showMessage = (text: string, type: MessageType = "error") => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage({ text: "", type: "" }), 4000);
-  };
 
   useEffect(() => {
     const cookieUsername = document.cookie
@@ -60,7 +25,8 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      return showMessage("Username and password are required.", "error");
+      toast.error("Username and password are required.");
+      return;
     }
 
     setLoading(true);
@@ -80,17 +46,14 @@ export default function Login() {
 
       if (res.ok && data.length > 0) {
         document.cookie = `username=${data[0].username}; path=/; max-age=86400`;
-        showMessage("Login successful! Redirecting...", "success");
+        toast.success("Login successful! Redirecting...");
         setTimeout(() => navigate("/dashboard"), 1000);
       } else {
-        showMessage("Invalid username or password.", "error");
+        toast.error("Invalid username or password.");
       }
     } catch (err) {
       console.error("Login error:", err);
-      showMessage(
-        "An unexpected error occurred during login. Please try again.",
-        "error"
-      );
+      toast.error("An unexpected error occurred during login. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -102,8 +65,6 @@ export default function Login() {
       
       {/* Subtle Background (Removed dark grid) */}
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white via-indigo-50/50 to-gray-100" />
-
-      <Message message={message} />
 
       {/* Main Login Card - White background, crisp shadow */}
       <div className="relative z-10 bg-white p-8 md:p-10 rounded-xl shadow-2xl shadow-indigo-200/50 w-full max-w-sm space-y-8 border border-gray-100">

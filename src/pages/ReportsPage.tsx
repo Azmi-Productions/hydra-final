@@ -1,6 +1,7 @@
 import { useEffect, useState, MouseEventHandler } from "react";
 import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock } from 'lucide-react';
-import toast from "react-hot-toast";
+import toast from "../utils/toast";
+import { supabase } from "../supabase";
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -136,6 +137,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       const updatedData = await res.json(); // now safe to parse
 
       onUpdate(updatedData[0] || editableReport); 
+      toast.success("Changes saved successfully!");
       onClose();
     } catch (err) {
       console.error(err);
@@ -160,6 +162,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       
       const updatedData = await res.json();
       onUpdate(updatedData[0] || { ...editableReport, status });
+      toast.success(`Report ${status} successfully!`);
       onClose();
     } catch (err) {
       console.error(err);
@@ -481,6 +484,7 @@ export default function ReportsListPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [activeTab, setActiveTab] = useState<'Ongoing' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
 
   const fetchReports = async () => {
     setLoading(true);
@@ -497,7 +501,31 @@ export default function ReportsListPage() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => { 
+    fetchReports(); 
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('table-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reports',
+        },
+        (payload) => {
+          console.log('Change received!', payload);
+          toast.success("New data received! Refreshing...");
+          fetchReports();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleReportClick = (report: Report) => setSelectedReport(report);
 
@@ -584,46 +612,72 @@ export default function ReportsListPage() {
           </div>
         ) : (
           /* Report Sections */
-          <div className="space-y-8">
-            <Section title="Ongoing Activity" color="#f59e0b" count={startedReports.length}>
-              {startedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-              <PaginationPills
-                page={pageStarted}
-                total={startedReports.length}
-                itemsPerPage={itemsPerPage}
-                onChange={setPageStarted}
-              />
-            </Section>
+          <div className="space-y-6">
+            
+            {/* Tab Navigation - Pill Style */}
+            <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide px-4 pt-2 pb-2">
+              {[
+                { key: 'Ongoing', label: 'Ongoing', shortLabel: 'Ongoing', count: startedReports.length, bgColor: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-white' },
+                { key: 'Pending', label: 'Pending', shortLabel: 'Pending', count: pendingReports.length, bgColor: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-white' },
+                { key: 'Approved', label: 'Approved', shortLabel: 'Approved', count: approvedReports.length, bgColor: 'bg-green-500', hoverColor: 'hover:bg-green-600', textColor: 'text-white' },
+                { key: 'Rejected', label: 'Rejected', shortLabel: 'Rejected', count: rejectedReports.length, bgColor: 'bg-red-500', hoverColor: 'hover:bg-red-600', textColor: 'text-white' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as any)}
+                  className={`
+                    px-2 sm:px-3 py-1.5 sm:py-2 rounded-full font-medium text-xs transition-all duration-200 flex items-center gap-1 sm:gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0
+                    ${activeTab === tab.key
+                      ? `${tab.bgColor} ${tab.textColor} scale-105 shadow-md ring-1 ring-offset-1`
+                      : `bg-slate-100 text-slate-600 ${tab.hoverColor} hover:text-white`}
+                  `}
+                  style={activeTab === tab.key ? {
+                    '--tw-ring-color': tab.bgColor.replace('bg-', '').replace('-500', ''),
+                    '--tw-ring-opacity': '0.7'
+                  } as React.CSSProperties : {}}
+                >
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <span className={`px-1 py-0.5 rounded-full text-xs font-medium ${
+                    activeTab === tab.key ? 'bg-white bg-opacity-20 text-white' : 'bg-white text-slate-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-            <Section title="Pending Review" color="#f59e0b" count={pendingReports.length}>
-              {pendingPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-              <PaginationPills
-                page={pagePending}
-                total={pendingReports.length}
-                itemsPerPage={itemsPerPage}
-                onChange={setPagePending}
-              />
-            </Section>
+            {/* Tab Content */}
+            <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
+              
+              {activeTab === 'Ongoing' && (
+                <Section title="Ongoing Activity" color="#f59e0b" count={startedReports.length}>
+                  {startedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  <PaginationPills page={pageStarted} total={startedReports.length} itemsPerPage={itemsPerPage} onChange={setPageStarted} />
+                </Section>
+              )}
 
-            <Section title="Approved Reports" color="#10b981" count={approvedReports.length}>
-              {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-              <PaginationPills
-                page={pageApproved}
-                total={approvedReports.length}
-                itemsPerPage={itemsPerPage}
-                onChange={setPageApproved}
-              />
-            </Section>
+              {activeTab === 'Pending' && (
+                <Section title="Pending Review" color="#f59e0b" count={pendingReports.length}>
+                  {pendingPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  <PaginationPills page={pagePending} total={pendingReports.length} itemsPerPage={itemsPerPage} onChange={setPagePending} />
+                </Section>
+              )}
 
-            <Section title="Rejected Reports" color="#ef4444" count={rejectedReports.length}>
-              {rejectedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-              <PaginationPills
-                page={pageRejected}
-                total={rejectedReports.length}
-                itemsPerPage={itemsPerPage}
-                onChange={setPageRejected}
-              />
-            </Section>
+              {activeTab === 'Approved' && (
+                <Section title="Approved Reports" color="#10b981" count={approvedReports.length}>
+                  {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
+                </Section>
+              )}
+
+              {activeTab === 'Rejected' && (
+                 <Section title="Rejected Reports" color="#ef4444" count={rejectedReports.length}>
+                   {rejectedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                   <PaginationPills page={pageRejected} total={rejectedReports.length} itemsPerPage={itemsPerPage} onChange={setPageRejected} />
+                 </Section>
+               )}
+            </div>
           </div>
         )}
       </div>
