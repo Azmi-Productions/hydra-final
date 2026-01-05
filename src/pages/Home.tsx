@@ -12,7 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Clock, Activity, Layers, CheckCircle, Users, LucideIcon, TrendingUp } from "lucide-react";
+import { Clock, Activity, Layers,  Users, LucideIcon, TrendingUp } from "lucide-react";
 import { colors, spacing, typography, borderRadius, shadows } from '../designTokens';
 
 // --- Supabase REST API Config ---
