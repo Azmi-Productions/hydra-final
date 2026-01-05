@@ -501,8 +501,8 @@ export default function ReportsListPage() {
     setLoading(false);
   };
 
-  useEffect(() => { 
-    fetchReports(); 
+  useEffect(() => {
+    fetchReports();
 
     // Realtime subscription
     const channel = supabase
@@ -522,8 +522,14 @@ export default function ReportsListPage() {
       )
       .subscribe();
 
+    // Autorefres 60 seconk
+    const intervalId = setInterval(() => {
+      fetchReports();
+    }, 60000); // 60 seconds
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(intervalId); // Clear the interval when component unmounts
     };
   }, []);
 
