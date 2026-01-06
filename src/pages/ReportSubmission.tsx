@@ -1,6 +1,7 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2 } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -168,6 +169,7 @@ export default function ReportSubmissionPage() {
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const username = getCookie("username") || "Unknown";
 
@@ -195,6 +197,40 @@ export default function ReportSubmissionPage() {
   useEffect(() => {
     fetchStartedActivities();
   }, []);
+
+  const deleteActivity = async (e: React.MouseEvent, activityId: string) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    
+    if (!window.confirm(`Are you sure you want to delete report ${activityId}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${activityId}`, {
+        method: "DELETE",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`
+        }
+      });
+
+      if (!res.ok) throw new Error("Failed to delete activity");
+
+      toast.success(`Activity ${activityId} deleted successfully.`);
+      
+      // If the deleted activity was selected, deselect it
+      if (selectedActivity && selectedActivity.activity_id === activityId) {
+        setSelectedActivity(null);
+        setPhotoFiles([]);
+        setUploadedPhotoUrls([]);
+      }
+      
+      fetchStartedActivities();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete activity.");
+    }
+  };
 
   const getLocation = () => {
     if (!navigator.geolocation) {
@@ -316,116 +352,141 @@ const handleSubmit = async () => {
       toast.error("Please fill in all required fields (Damage Type, Remarks).");
       return;
   }
-  // Simplified check for now - can be more granular if needed
 
-  // --- Upload photos first ---
-  let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
+  setIsSubmitting(true);
 
-  if (photoFiles.length > 0) {
-    for (const file of photoFiles) {
-      const formData = new FormData();
-      formData.append("file", file);
+  try {
+    // --- Upload photos first (Parallel & Compressed) ---
+    let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
 
-      const uploadRes = await fetch(
-        "https://azmiproductions.com/api/hydra/upload.php",
-        {
-          method: "POST",
-          body: formData,
+    if (photoFiles.length > 0) {
+      const uploadPromises = photoFiles.map(async (file) => {
+        try {
+          // Compression
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(file, options);
+          
+          const formData = new FormData();
+          formData.append("file", compressedFile);
+
+          const uploadRes = await fetch(
+            "https://azmiproductions.com/api/hydra/upload.php",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!uploadRes.ok) throw new Error("Upload failed");
+          
+          const data = await uploadRes.json();
+          return data.url;
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          toast.error(`Failed to upload one of the images.`);
+          return null;
         }
-      );
+      });
 
-      if (!uploadRes.ok) {
-        const text = await uploadRes.text();
-        console.error("Upload error:", text);
-        toast.error(`Upload Failed: ${text.substring(0, 50)}...`);
-        return;
-      }
+      const results = await Promise.all(uploadPromises);
+      const successfulUploads = results.filter((url): url is string => url !== null);
+      photoLinks = [...photoLinks, ...successfulUploads];
 
-      const data = await uploadRes.json();
-      console.log("Uploaded file:", data);
-
-      // --- Add the uploaded file URL to photoLinks ---
-      if (data.url) {
-        photoLinks.push(data.url);
-      }
+      // Clear local files after upload attempt
+      setUploadedPhotoUrls(photoLinks);
+      setPhotoFiles([]);
     }
 
-    // Clear local files after upload
-    setUploadedPhotoUrls(photoLinks);
+    // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
+    const now = new Date();
+    const startDateTime = new Date(`${date}T${startTime}:00`);
+
+    if (isNaN(startDateTime.getTime())) {
+      console.error("Invalid Start Date/Time", date, startTime);
+      // Fallback or error - deciding to set to now so duration is minimal
+      startDateTime.setTime(now.getTime()); 
+    }
+
+    // If current time is earlier than start datetime → activity crossed to next day
+    if (now < startDateTime) {
+      startDateTime.setDate(startDateTime.getDate() - 1);
+    }
+
+    let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+
+    // Enforce minimum duration of 0.05 hours (3 mins)
+    if (isNaN(diffHours) || diffHours < 0.05) {
+      diffHours = 0.05;
+    }
+
+    const finalDurationStr = diffHours.toFixed(2);
+
+    setEndTime(now.toTimeString().slice(0, 5));
+    setDuration(finalDurationStr);
+
+    // --- Update location ---
+    getLocation();
+
+    const payload = {
+      date,
+      start_time: startTime,
+      end_time: now.toTimeString().slice(0, 5),
+      day,
+      duration: finalDurationStr,
+      damage_type: damageType,
+      equipment_used: equipmentList,
+      manpower_involved: manpowerList,
+      excavation: excavation || null,
+      sand: sand || null,
+      aggregate: aggregate || null,
+      premix: premix || null,
+      pipe_usage: pipeUsage || null,
+      fittings,
+      remarks,
+      end_latitude: latitude,
+      end_longitude: longitude,
+      end_gmap_link: gmapLink,
+      photo_link: photoLinks,
+      status: "Pending",
+    };
+
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${selectedActivity.activity_id}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error(err);
+      toast.error(`Submit Failed: ${err.message || err.details || err.hint || "Unknown error"}`);
+      return;
+    }
+
+    toast.success(`Report for ${activityId} submitted successfully!`);
+    setIsOngoing(false);
+    setSelectedActivity(null);
     setPhotoFiles([]);
-  }
-
-  // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
-  const now = new Date();
-
-  // Full start datetime based on saved date + startTime
-  const startDateTime = new Date(`${date}T${startTime}:00`);
-
-  // If current time is earlier than start datetime → activity crossed to next day
-  if (now < startDateTime) {
-    // Move start one day back
-    startDateTime.setDate(startDateTime.getDate() - 1);
-  }
-
-  // Duration in hours
-  const diffHours =
-    (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
-
-  setEndTime(now.toTimeString().slice(0, 5));
-  setDuration(diffHours.toFixed(2));
-
-  // --- Update location ---
-  getLocation();
-
-  const payload = {
-    date,
-    start_time: startTime,
-    end_time: now.toTimeString().slice(0, 5),
-    day,
-    duration: diffHours.toFixed(2),
-    damage_type: damageType,
-    equipment_used: equipmentList,
-    manpower_involved: manpowerList,
-    excavation: excavation || null,
-    sand: sand || null,
-    aggregate: aggregate || null,
-    premix: premix || null,
-    pipe_usage: pipeUsage || null,
-    fittings,
-    remarks,
-    end_latitude: latitude,
-    end_longitude: longitude,
-    end_gmap_link: gmapLink,
-    photo_link: photoLinks,
-    status: "Pending",
-  };
-
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${selectedActivity.activity_id}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
+    fetchStartedActivities();
+    
+  } catch (err) {
     console.error(err);
-    toast.error(`Submit Failed: ${err.message || err.details || err.hint || "Unknown error"}`);
-    return;
+    toast.error("An error occurred during submission.");
+  } finally {
+    setIsSubmitting(false);
   }
-
-  toast.success(`Report for ${activityId} submitted successfully!`);
-  setIsOngoing(false);
-  setSelectedActivity(null);
-  setPhotoFiles([]);
-  fetchStartedActivities();
 };
 
 
@@ -453,7 +514,16 @@ const handleSubmit = async () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-bold text-blue-600">{act.activity_id}</span>
-                    <span className="text-sm text-gray-500">{act.start_time}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">{act.start_time}</span>
+                      <button 
+                        onClick={(e) => deleteActivity(e, act.activity_id)}
+                        className="p-1 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition"
+                        title="Cancel/Delete Activity"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   {act.damage_type && (
                     <p className="text-gray-700 text-sm mb-2">
@@ -648,9 +718,18 @@ const handleSubmit = async () => {
 
                 <button
                   onClick={handleSubmit}
-                  className="w-full mt-4 py-3 px-6 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition"
+                  disabled={isSubmitting}
+                  className={`w-full mt-4 py-3 px-6 text-white font-semibold rounded-xl transition flex items-center justify-center ${
+                    isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                  }`}
                 >
-                  Submit Report
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Submitting...
+                    </>
+                  ) : (
+                    "Submit Report"
+                  )}
                 </button>
               </div>
             </div>
