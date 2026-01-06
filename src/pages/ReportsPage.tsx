@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download } from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 
@@ -583,11 +583,86 @@ export default function ReportsListPage() {
     pageRejected * itemsPerPage
   );
 
-  const Section = ({ title, color, count, children }: { title: string, color: string, count: number, children: React.ReactNode }) => (
+  /* CSV Export Function */
+  const exportToCSV = (data: Report[], filename: string) => {
+    if (!data || !data.length) {
+      toast.error("No data to export.");
+      return;
+    }
+
+    // Define columns
+    const headers = [
+      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)", 
+      "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)", 
+      "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Pipe Usage (m)", "Fittings", 
+      "Remarks", "Start Lat", "Start Long", "End Lat", "End Long", "Status", "Submitted By"
+    ];
+
+    const csvRows = [headers.join(",")];
+
+    const escapeCSV = (value: string | number | null | undefined) => {
+      if (value === null || value === undefined) return '""';
+      const stringValue = String(value);
+      // Escape double quotes by replacing " with ""
+      const escaped = stringValue.replace(/"/g, '""'); 
+      return `"${escaped}"`;
+    };
+
+    for (const row of data) {
+      const values = [
+        escapeCSV(row.id),
+        escapeCSV(row.activity_id),
+        escapeCSV(row.date),
+        escapeCSV(row.day),
+        escapeCSV(row.start_time),
+        escapeCSV(row.end_time),
+        escapeCSV(row.duration),
+        escapeCSV(row.damage_type),
+        escapeCSV(row.equipment_used),
+        escapeCSV(row.manpower_involved),
+        escapeCSV(row.excavation || 0),
+        escapeCSV(row.sand || 0),
+        escapeCSV(row.aggregate || 0),
+        escapeCSV(row.premix || 0),
+        escapeCSV(row.pipe_usage || 0),
+        escapeCSV(row.fittings),
+        escapeCSV(row.remarks), 
+        escapeCSV(row.start_latitude || ''),
+        escapeCSV(row.start_longitude || ''),
+        escapeCSV(row.end_latitude || ''),
+        escapeCSV(row.end_longitude || ''),
+        escapeCSV(row.status),
+        escapeCSV(row.submitted_by)
+      ];
+      csvRows.push(values.join(","));
+    }
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.setAttribute("hidden", "");
+    a.setAttribute("href", url);
+    a.setAttribute("download", filename);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const Section = ({ title, color, count, children, onExport }: { title: string, color: string, count: number, children: React.ReactNode, onExport?: () => void }) => (
     <section className="bg-white p-6 rounded-xl shadow-lg border-t-4" style={{ borderColor: color }}>
-      <h2 className={`text-2xl font-bold mb-5`} style={{ color }}>
-        {title} ({count})
-      </h2>
+      <div className="flex justify-between items-center mb-5">
+        <h2 className={`text-2xl font-bold`} style={{ color }}>
+          {title} ({count})
+        </h2>
+        {onExport && (
+          <button 
+            onClick={onExport}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition font-semibold text-sm"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        )}
+      </div>
       <div className="space-y-4">{children}</div>
       {(!children || (Array.isArray(children) && children.length === 0)) && <p className="text-gray-500 italic">No reports in this category.</p>}
     </section>
@@ -671,7 +746,12 @@ export default function ReportsListPage() {
               )}
 
               {activeTab === 'Approved' && (
-                <Section title="Approved Reports" color="#10b981" count={approvedReports.length}>
+                <Section 
+                  title="Approved Reports" 
+                  color="#10b981" 
+                  count={approvedReports.length}
+                  onExport={() => exportToCSV(approvedReports, `approved_reports_${new Date().toISOString().split('T')[0]}.csv`)}
+                >
                   {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
                   <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
                 </Section>

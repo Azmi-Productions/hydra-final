@@ -16,6 +16,7 @@
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
+    "browser-image-compression": "^2.0.2",
     "caniuse-lite": "^1.0.30001746",
     "chart.js": "^4.4.9",
     "cookie-parser": "^1.4.7",
