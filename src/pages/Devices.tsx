@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import toast from "../utils/toast";
 import { ClockIcon, ComputerDesktopIcon, MapPinIcon, WifiIcon, XCircleIcon } from "@heroicons/react/24/solid";
 
@@ -57,16 +58,25 @@ const DeviceStatusCard: React.FC<{ device: DeviceStatus }> = ({ device }) => {
           <span className="ml-2">{formattedTimestamp}</span>
         </div>
 
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${device.latitude},${device.longitude}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center text-sm text-blue-500 hover:text-blue-700 transition duration-150"
-        >
-          <MapPinIcon className="w-4 h-4 mr-2" />
-          <span className="underline">View Location</span>
-          <span className="ml-2 text-xs text-gray-400">({device.latitude.toFixed(4)}, {device.longitude.toFixed(4)})</span>
-        </a>
+        <div className="flex gap-4">
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${device.latitude},${device.longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center text-sm text-blue-500 hover:text-blue-700 transition duration-150"
+          >
+            <MapPinIcon className="w-4 h-4 mr-2" />
+            <span className="underline">View Location</span>
+          </a>
+
+          <Link
+            to={`/device-history/${device.device_id}`}
+            className="flex items-center text-sm text-indigo-500 hover:text-indigo-700 transition duration-150"
+          >
+            <ClockIcon className="w-4 h-4 mr-2" />
+            <span className="underline">View History</span>
+          </Link>
+        </div>
       </div>
     </div>
   );
