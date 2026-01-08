@@ -126,7 +126,7 @@ const DeviceStatusPage = () => {
           device_id: d.device_id,
           alias: aliasToUse,
           latestTimestamp: d.timestamp,
-          status: diffMinutes <= 30 ? "Online" : "Offline",
+          status: diffMinutes <= 15 ? "Online" : "Offline",
           latitude: d.latitude,
           longitude: d.longitude,
         };
