@@ -10,6 +10,7 @@ import LiveDeviceMap from "./pages/LiveMap.tsx";
 import { Toaster } from "react-hot-toast";
 import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
+import LocationHistoryPage from "./pages/LocationHistory.tsx";
 
 function AppWrapper() {
   const location = useLocation();
@@ -41,6 +42,15 @@ function AppWrapper() {
             element={
               <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
                 <DeviceStatusPage />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/device-history/:deviceId"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
+                <LocationHistoryPage />
               </ProtectedRoute>
             }
           />
