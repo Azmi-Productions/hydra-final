@@ -32,7 +32,7 @@ const DeviceStatusCard: React.FC<{ device: DeviceStatus }> = ({ device }) => {
   const statusColor = isOnline ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50";
   const StatusIcon = isOnline ? WifiIcon : XCircleIcon;
 
-  const formattedTimestamp = new Date(device.latestTimestamp).toLocaleString();
+  const formattedTimestamp = new Date(device.latestTimestamp).toLocaleString('en-GB');
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition duration-300 border border-gray-100">
