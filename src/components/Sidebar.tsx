@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
   const navItems = [
     { to: '/dashboard', label: 'Overview', allowedRoles: ['superadmin', 'admin'], icon: LayoutDashboard },
     { to: '/report-overview', label: 'Reports Center', allowedRoles: ['superadmin', 'admin'], icon: FileText },
-    { to: '/approved-reports', label: 'Approved Reports', allowedRoles: ['superadmin', 'admin', 'supervisor'], icon: FileCheck },
+    { to: '/approved-reports', label: 'Reports', allowedRoles: ['superadmin', 'admin', 'supervisor'], icon: FileCheck },
     { to: '/user-management', label: 'User Manager', allowedRoles: ['superadmin'], icon: Users },
     { to: '/device-manager', label: 'Device Manager', allowedRoles: ['superadmin', 'admin'], icon: Cpu },
     { to: '/live-map', label: 'Live Map', allowedRoles: ['superadmin', 'admin'], icon: Map },

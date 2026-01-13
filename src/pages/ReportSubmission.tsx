@@ -551,6 +551,14 @@ const handleSubmit = async () => {
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
+    // Validate date and startTime presence
+    if (!date || !startTime) {
+       console.error("Missing Date or StartTime", date, startTime);
+       toast.error("Invalid Activity Start Time. Please restart activity.");
+       setIsSubmitting(false);
+       return;
+    }
+
     const startDateTime = new Date(`${date}T${startTime}:00`);
 
     if (isNaN(startDateTime.getTime())) {
@@ -726,7 +734,7 @@ const handleSubmit = async () => {
                 <div className="hidden">
   <FormInput label="Latitude" placeholder="Latitude" value={latitude ?? ""} readOnly />
   <FormInput label="Longitude" placeholder="Longitude" value={longitude ?? ""} readOnly />
-  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink} readOnly />
+  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink ?? ""} readOnly />
 </div>
 
                 
@@ -751,13 +759,13 @@ const handleSubmit = async () => {
                   <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date} onChange={(e) => setDate(e.target.value)} readOnly />
-                  <FormInput label="Start Time" placeholder="Auto" value={startTime} readOnly />
-                  <FormInput label="End Time" placeholder="Auto" value={endTime} readOnly />
+                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                  <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
+                  <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <FormInput label="Day" placeholder="Auto-calculated" value={day} readOnly />
-                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration} readOnly />
+                  <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
+                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                 </div>
                 <hr className="border-gray-100 pt-3" />
                 <FormInput label="Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
@@ -774,12 +782,12 @@ const handleSubmit = async () => {
 
                 <ListInput label="Equipment Used" items={equipmentList} setItems={setEquipmentList} placeholder="Add equipment" />
                 <ListInput label="Manpower Involved" items={manpowerList} setItems={setManpowerList} placeholder="Add manpower" />
-                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage} onChange={(e) => setPipeUsage(e.target.value)} />
-                <FormInput label="Fittings" placeholder="Fittings" value={fittings} onChange={(e) => setFittings(e.target.value)} />
+                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
+                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
+                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
+                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
+                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
+                <FormInput label="Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
                 {/* Photo Upload */}

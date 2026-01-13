@@ -117,6 +117,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
   const getStatusBadge = (status: string) => {
     if (status === 'Approved') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-green-100 text-green-700";
     if (status === 'Pending') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700";
+    if (status === 'Started') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-blue-100 text-blue-700";
     return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-gray-100 text-gray-700";
   };
 
@@ -171,7 +172,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
               <label className={labelStyle}>Damage Type</label>
               <input
                 type="text"
-                value={editableReport.damage_type}
+                value={editableReport.damage_type ?? ""}
                 onChange={(e) => handleChange("damage_type", e.target.value)}
                 readOnly={!isRejected}
                 className={inputStyle}
@@ -195,11 +196,11 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className={labelStyle}>Equipment Used</label>
-                <input type="text" value={editableReport.equipment_used} onChange={(e) => handleChange("equipment_used", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                <input type="text" value={editableReport.equipment_used ?? ""} onChange={(e) => handleChange("equipment_used", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div>
                 <label className={labelStyle}>Manpower Involved</label>
-                <input type="text" value={editableReport.manpower_involved} onChange={(e) => handleChange("manpower_involved", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                <input type="text" value={editableReport.manpower_involved ?? ""} onChange={(e) => handleChange("manpower_involved", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
             </div>
           </section>
@@ -301,6 +302,7 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
   const getStatusBadge = (status: string) => {
     if (status === 'Approved') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-green-500 text-white";
     if (status === 'Pending') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-yellow-500 text-white";
+    if (status === 'Started') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-blue-500 text-white";
     return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-gray-500 text-white";
   };
 
@@ -316,12 +318,12 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
           <MapPin className="w-5 h-5 mr-3 text-indigo-500" />
           {report.activity_id}
         </h3>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
+        <div className="text-sm text-gray-500 ml-8 mt-1">
           <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
            <p className="text-sm text-gray-500 mt-1">
   Submitted by: <span className="font-medium">{report.submitted_by}</span>
 </p>
-        </p>
+        </div>
       </div>
 
       {/* Right: Duration and Status */}
@@ -349,12 +351,12 @@ export default function ApprovedReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'Pending' | 'Approved' | 'Rejected'>('Pending');
+  const [activeTab, setActiveTab] = useState<'Pending' | 'Approved' | 'Rejected' | 'Ongoing'>('Ongoing');
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      let query = `${supabaseUrl}/rest/v1/reports?select=*&status=in.(Approved,Pending,Rejected)&order=status.asc,created_at.desc`;
+      let query = `${supabaseUrl}/rest/v1/reports?select=*&status=in.(Approved,Pending,Rejected,Started)&order=status.asc,created_at.desc`;
       if (role === 'supervisor' && username) {
         query += `&submitted_by=eq.${username}`;
       }
@@ -403,6 +405,7 @@ export default function ApprovedReportsPage() {
   const pendingReports = reports.filter(r => r.status === 'Pending');
   const approvedReports = reports.filter(r => r.status === 'Approved');
   const rejectedReports = reports.filter(r => r.status === 'Rejected');
+  const startedReports = reports.filter(r => r.status === 'Started');
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
@@ -411,7 +414,7 @@ export default function ApprovedReportsPage() {
         {/* Header */}
         <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300">
           <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            Report Status
+            Reports
           </h1>
           <p className="text-gray-500 mt-2 italic text-lg">
             {role === 'supervisor' ? 'View your report status including pending and approved reports.' : 'View all reports status including pending and approved reports.'} Click any report for detailed information.
@@ -432,6 +435,7 @@ export default function ApprovedReportsPage() {
              {/* Tab Navigation - Pill Style */}
              <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide px-4 pt-2 pb-2">
               {[
+                { key: 'Ongoing', label: 'Ongoing Actions', shortLabel: 'Ongoing', count: startedReports.length, bgColor: 'bg-blue-500', hoverColor: 'hover:bg-blue-600', textColor: 'text-white' },
                 { key: 'Pending', label: 'Pending Reports', shortLabel: 'Pending', count: pendingReports.length, bgColor: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-white' },
                 { key: 'Approved', label: 'Approved Reports', shortLabel: 'Approved', count: approvedReports.length, bgColor: 'bg-green-500', hoverColor: 'hover:bg-green-600', textColor: 'text-white' },
                 { key: 'Rejected', label: 'Rejected Reports', shortLabel: 'Rejected', count: rejectedReports.length, bgColor: 'bg-red-500', hoverColor: 'hover:bg-red-600', textColor: 'text-white' },
@@ -463,6 +467,20 @@ export default function ApprovedReportsPage() {
 
             {/* Tab Content */}
             <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
+            
+            {/* Ongoing Reports Section */}
+            {activeTab === 'Ongoing' && (
+              <div className="p-6">
+                 {startedReports.length === 0 ? (
+                    <p className="text-gray-500 italic">No ongoing activities.</p>
+                 ) : (
+                  <div className="space-y-4">
+                    {startedReports.map(r => <ReportListItem key={r.id} report={{...r, status: 'Ongoing'}} onClick={() => handleReportClick(r)} />)}
+                  </div>
+                 )}
+              </div>
+            )}
+
             {/* Pending Reports Section */}
             {activeTab === 'Pending' && (
               <div className="p-6">
