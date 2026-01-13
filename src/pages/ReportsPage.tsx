@@ -121,11 +121,18 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      if (!confirm(`Assign ${username} to this activity?`)) return;
      setSaving(true);
      try {
+        // Use Malaysia time zone
+        const now = new Date();
+        const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+        const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+        const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
+        const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+
         const payload = {
            activity_id: report.activity_id,
-           date: new Date().toISOString().slice(0, 10),
-           start_time: new Date().toTimeString().slice(0, 5),
-           day: new Date().toLocaleDateString("en-US", { weekday: "long" }),
+           date: todayStr,
+           start_time: timeStr,
+           day: weekdayStr,
            status: 'Started',
            submitted_by: username,
            // Copy basic location/timing from original if available, or leave blank?
@@ -937,11 +944,16 @@ export default function ReportsListPage() {
               )}
 
               {activeTab === 'Approved' && (
-                <Section 
-                  title="Approved Reports" 
-                  color="#10b981" 
+                <Section
+                  title="Approved Reports"
+                  color="#10b981"
                   count={approvedReports.length}
-                  onExport={() => exportToCSV(approvedReports, `approved_reports_${new Date().toISOString().split('T')[0]}.csv`)}
+                  onExport={() => {
+                    const now = new Date();
+                    const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+                    const todayStr = malaysiaTime.toLocaleDateString("en-GB", {timeZone: "Asia/Kuala_Lumpur"}).replace(/\//g, '-'); // DD-MM-YYYY for filename
+                    exportToCSV(approvedReports, `approved_reports_${todayStr}.csv`);
+                  }}
                 >
                   {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
                   <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />

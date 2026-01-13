@@ -183,8 +183,10 @@ export default function ReportSubmissionPage() {
 
   useEffect(() => {
     if (date) {
-      const d = new Date(date);
-      const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+      // Parse date in YYYY-MM-DD format
+      const [year, month, dayPart] = date.split('-');
+      const parsedDate = new Date(`${year}-${month}-${dayPart}`);
+      const weekday = parsedDate.toLocaleDateString("en-US", { weekday: "long" });
       setDay(weekday);
     }
   }, [date]);
@@ -281,10 +283,12 @@ export default function ReportSubmissionPage() {
     console.error(e);
   }
 
+  // Use Malaysia time zone
   const now = new Date();
-  const timeStr = now.toTimeString().slice(0, 5);
-  const todayStr = now.toISOString().slice(0, 10);
-  const weekdayStr = now.toLocaleDateString("en-US", { weekday: "long" });
+  const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+  const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+  const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
+  const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
   setStartTime(timeStr);
   setDate(todayStr);
@@ -419,28 +423,30 @@ export default function ReportSubmissionPage() {
 
       // --- Calculate Duration for Draft (optional, but good to have current snapshot) ---
       const now = new Date();
-      const startDateTime = new Date(`${date}T${startTime}:00`);
+      const malaysiaNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+
+      // Date is already in YYYY-MM-DD format
+      const isoDateStr = date;
+      const startDateTime = new Date(`${isoDateStr}T${startTime}:00`);
 
       if (isNaN(startDateTime.getTime())) {
-        startDateTime.setTime(now.getTime()); 
+        startDateTime.setTime(malaysiaNow.getTime());
       }
-      if (now < startDateTime) {
+      if (malaysiaNow < startDateTime) {
         startDateTime.setDate(startDateTime.getDate() - 1);
       }
-      let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+      let diffHours = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
       if (isNaN(diffHours) || diffHours < 0.05) {
         diffHours = 0.05;
       }
       const finalDurationStr = diffHours.toFixed(2);
 
-      // --- Update location ---
-      getLocation(); // Try to update location for draft
+      // Do not update location for draft to avoid capturing end_time prematurely
 
       const payload = {
         date,
         start_time: startTime,
-        // end_time: now.toTimeString().slice(0, 5), // Maybe don't set end_time for draft? Or set it? Let's update it as "current progress"
-        end_time: now.toTimeString().slice(0, 5),
+        // Do not set end_time for draft
         day,
         duration: finalDurationStr,
         damage_type: damageType,
@@ -453,9 +459,7 @@ export default function ReportSubmissionPage() {
         pipe_usage: pipeUsage || null,
         fittings,
         remarks,
-        end_latitude: latitude,
-        end_longitude: longitude,
-        end_gmap_link: gmapLink,
+        // Do not update end location for draft
         photo_link: photoLinks,
         status: "Started", // IMPORTANT: Keep status as Started
       };
@@ -560,6 +564,8 @@ const handleSubmit = async () => {
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
+    const malaysiaNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+
     // Validate date and startTime presence
     if (!date || !startTime) {
        console.error("Missing Date or StartTime", date, startTime);
@@ -568,20 +574,22 @@ const handleSubmit = async () => {
        return;
     }
 
-    const startDateTime = new Date(`${date}T${startTime}:00`);
+    // Date is already in YYYY-MM-DD format
+    const isoDateStr = date;
+    const startDateTime = new Date(`${isoDateStr}T${startTime}:00`);
 
     if (isNaN(startDateTime.getTime())) {
       console.error("Invalid Start Date/Time", date, startTime);
       // Fallback or error - deciding to set to now so duration is minimal
-      startDateTime.setTime(now.getTime()); 
+      startDateTime.setTime(malaysiaNow.getTime());
     }
 
     // If current time is earlier than start datetime → activity crossed to next day
-    if (now < startDateTime) {
+    if (malaysiaNow < startDateTime) {
       startDateTime.setDate(startDateTime.getDate() - 1);
     }
 
-    let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+    let diffHours = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
 
     // Enforce minimum duration of 0.05 hours (3 mins)
     if (isNaN(diffHours) || diffHours < 0.05) {
@@ -590,7 +598,8 @@ const handleSubmit = async () => {
 
     const finalDurationStr = diffHours.toFixed(2);
 
-    setEndTime(now.toTimeString().slice(0, 5));
+    const malaysiaEndTime = malaysiaNow.toTimeString().slice(0, 5);
+    setEndTime(malaysiaEndTime);
     setDuration(finalDurationStr);
 
     // --- Update location ---
@@ -599,7 +608,7 @@ const handleSubmit = async () => {
     const payload = {
       date,
       start_time: startTime,
-      end_time: now.toTimeString().slice(0, 5),
+      end_time: malaysiaEndTime,
       day,
       duration: finalDurationStr,
       damage_type: damageType,
@@ -768,7 +777,7 @@ const handleSubmit = async () => {
                   <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                  <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
                   <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
                   <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
                 </div>
