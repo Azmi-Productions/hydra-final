@@ -177,6 +177,7 @@ export default function ReportSubmissionPage() {
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   const username = getCookie("username") || "Unknown";
 
@@ -262,6 +263,7 @@ export default function ReportSubmissionPage() {
   }
 
   // WAIT FOR LOCATION
+  setIsStarting(true);
   let lat = null;
   let lng = null;
   let link = null;
@@ -300,32 +302,39 @@ export default function ReportSubmissionPage() {
     submitted_by: username,
   };
 
-  const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
-      "Prefer": "return=representation",
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Prefer": "return=representation",
+        },
+        body: JSON.stringify(payload),
+      });
 
-  if (!res.ok) {
-    const err = await res.json();
-    console.error(err);
-    toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
-    return;
-  }
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
+        return;
+      }
 
-  const data = await res.json();
-  toast.success(`Activity ${activityId} started at ${timeStr}`);
-  fetchStartedActivities();
-  
-  if (data && data.length > 0) {
-    selectActivity(data[0]);
+      const data = await res.json();
+      toast.success(`Activity ${activityId} started at ${timeStr}`);
+      fetchStartedActivities();
+      
+      if (data && data.length > 0) {
+        selectActivity(data[0]);
+      }
+  } catch (err) {
+      console.error(err);
+      toast.error("An error occurred while starting activity.");
+  } finally {
+      setIsStarting(false);
   }
-};
+  };
 
 
   function selectActivity(activity: any) {
@@ -920,6 +929,17 @@ const handleSubmit = async () => {
           )}
         </div>
       </div>
+      
+      {/* Loading Overlay */}
+      {isStarting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex flex-col items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center shadow-2xl max-w-sm w-full text-center">
+             <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+             <h3 className="text-xl font-bold text-gray-900 mb-2">Starting Activity...</h3>
+             <p className="text-gray-600">Please wait while we create the activity report.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
