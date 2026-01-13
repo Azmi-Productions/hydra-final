@@ -38,6 +38,11 @@ const FormInput = ({ label, placeholder, type = 'text', value, onChange, readOnl
     <label className="text-sm font-medium text-gray-600 mb-1 block">{label}</label>
     <input
       type={type}
+      min={type === 'number' ? "0" : undefined}
+      onInput={type === 'number' ? (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.value && parseFloat(target.value) < 0) target.value = "0";
+      } : undefined}
       className={`w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${readOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
       placeholder={placeholder}
       value={value}
@@ -769,11 +774,11 @@ const handleSubmit = async () => {
 
                 <ListInput label="Equipment Used" items={equipmentList} setItems={setEquipmentList} placeholder="Add equipment" />
                 <ListInput label="Manpower Involved" items={manpowerList} setItems={setManpowerList} placeholder="Add manpower" />
-                <FormInput label="Excavation (m³)" placeholder="Excavation quantity" value={excavation} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Sand (m³)" placeholder="Sand quantity" value={sand} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Aggregate (m³)" placeholder="Aggregate quantity" value={aggregate} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Premix (m³)" placeholder="Premix quantity" value={premix} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Pipe Usage (m)" placeholder="Pipe usage" value={pipeUsage} onChange={(e) => setPipeUsage(e.target.value)} />
+                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation} onChange={(e) => setExcavation(e.target.value)} />
+                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand} onChange={(e) => setSand(e.target.value)} />
+                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate} onChange={(e) => setAggregate(e.target.value)} />
+                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix} onChange={(e) => setPremix(e.target.value)} />
+                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage} onChange={(e) => setPipeUsage(e.target.value)} />
                 <FormInput label="Fittings" placeholder="Fittings" value={fittings} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
