@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 // --- Supabase REST API ---
@@ -93,14 +93,16 @@ interface ListInputProps {
 const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
   const [input, setInput] = useState("");
 
+  const safeItems = Array.isArray(items) ? items : [];
+
   const addItem = () => {
     if (!input.trim()) return;
-    setItems([...items, input.trim()]);
+    setItems([...safeItems, input.trim()]);
     setInput("");
   };
 
   const removeItem = (index: number) => {
-    const newItems = [...items];
+    const newItems = [...safeItems];
     newItems.splice(index, 1);
     setItems(newItems);
   };
@@ -129,7 +131,7 @@ const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
         </button>
       </div>
       <ul className="list-disc list-inside space-y-1">
-        {items.map((item, idx) => (
+        {safeItems.map((item, idx) => (
           <li key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
             {item}
             <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
@@ -311,13 +313,17 @@ export default function ReportSubmissionPage() {
     return;
   }
 
+  const data = await res.json();
   toast.success(`Activity ${activityId} started at ${timeStr}`);
   fetchStartedActivities();
-  window.location.reload();
+  
+  if (data && data.length > 0) {
+    selectActivity(data[0]);
+  }
 };
 
 
-  const selectActivity = (activity: any) => {
+  function selectActivity(activity: any) {
     setSelectedActivity(activity);
     setActivityId(activity.activity_id);
     setStartTime(activity.start_time);
@@ -327,8 +333,8 @@ export default function ReportSubmissionPage() {
     setDate(activity.date || new Date().toISOString().slice(0,10));
     setDay(activity.day || new Date().toLocaleDateString("en-US", { weekday: "long" }));
     setDamageType(activity.damage_type || "");
-    setEquipmentList(activity.equipment_used || []);
-    setManpowerList(activity.manpower_involved || []);
+    setEquipmentList(Array.isArray(activity.equipment_used) ? activity.equipment_used : []);
+    setManpowerList(Array.isArray(activity.manpower_involved) ? activity.manpower_involved : []);
     setExcavation(activity.excavation || "");
     setSand(activity.sand || "");
     setAggregate(activity.aggregate || "");
@@ -339,6 +345,143 @@ export default function ReportSubmissionPage() {
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
     setUploadedPhotoUrls(activity.photo_link || []);
+  }
+
+  const handleSaveDraft = async () => {
+    if (!selectedActivity) {
+      toast.error("Select a started activity first.");
+      return;
+    }
+
+    // Skipped validation for Draft
+
+    setIsSubmitting(true);
+
+    try {
+      // --- Upload photos first (Parallel & Compressed) ---
+      let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
+
+      if (photoFiles.length > 0) {
+        const uploadPromises = photoFiles.map(async (file) => {
+          try {
+            // Compression
+            const options = {
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+            };
+            const compressedFile = await imageCompression(file, options);
+            
+            const formData = new FormData();
+            formData.append("file", compressedFile);
+
+            const uploadRes = await fetch(
+              "https://azmiproductions.com/api/hydra/upload.php",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images.`);
+            return null;
+          }
+        });
+
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        photoLinks = [...photoLinks, ...successfulUploads];
+
+        // Clear local files after upload attempt
+        setUploadedPhotoUrls(photoLinks);
+        setPhotoFiles([]);
+      }
+
+      // --- Calculate Duration for Draft (optional, but good to have current snapshot) ---
+      const now = new Date();
+      const startDateTime = new Date(`${date}T${startTime}:00`);
+
+      if (isNaN(startDateTime.getTime())) {
+        startDateTime.setTime(now.getTime()); 
+      }
+      if (now < startDateTime) {
+        startDateTime.setDate(startDateTime.getDate() - 1);
+      }
+      let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+      if (isNaN(diffHours) || diffHours < 0.05) {
+        diffHours = 0.05;
+      }
+      const finalDurationStr = diffHours.toFixed(2);
+
+      // --- Update location ---
+      getLocation(); // Try to update location for draft
+
+      const payload = {
+        date,
+        start_time: startTime,
+        // end_time: now.toTimeString().slice(0, 5), // Maybe don't set end_time for draft? Or set it? Let's update it as "current progress"
+        end_time: now.toTimeString().slice(0, 5),
+        day,
+        duration: finalDurationStr,
+        damage_type: damageType,
+        equipment_used: equipmentList,
+        manpower_involved: manpowerList,
+        excavation: excavation || null,
+        sand: sand || null,
+        aggregate: aggregate || null,
+        premix: premix || null,
+        pipe_usage: pipeUsage || null,
+        fittings,
+        remarks,
+        end_latitude: latitude,
+        end_longitude: longitude,
+        end_gmap_link: gmapLink,
+        photo_link: photoLinks,
+        status: "Started", // IMPORTANT: Keep status as Started
+      };
+
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${selectedActivity.activity_id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        toast.error(`Save Draft Failed: ${err.message || "Unknown error"}`);
+        return;
+      }
+
+      toast.success(`Draft saved for ${activityId}!`);
+      
+      // Clear selection to go back to list view
+      setSelectedActivity(null);
+      setPhotoFiles([]);
+      setUploadedPhotoUrls([]);
+      
+      fetchStartedActivities();
+      
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred during save draft.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 const handleSubmit = async () => {
@@ -494,9 +637,25 @@ const handleSubmit = async () => {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto">
         <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300">
-          <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            Report Submission
-          </h1>
+
+          <div className="flex items-center gap-3">
+            {selectedActivity && (
+              <button
+                onClick={() => {
+                  setSelectedActivity(null);
+                  setPhotoFiles([]);
+                  setUploadedPhotoUrls([]);
+                }}
+                className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+                title="Back to Activity List"
+              >
+                <ArrowLeft className="w-6 h-6 text-gray-700" />
+              </button>
+            )}
+            <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
+              Report Submission
+            </h1>
+          </div>
           <p className="text-gray-500 mt-2 italic text-lg">
             Start activity or select a started activity to complete the report.
           </p>
@@ -577,6 +736,9 @@ const handleSubmit = async () => {
                 )}
               </div>
             </div>
+            
+
+
 
             {selectedActivity && (
               <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
@@ -716,6 +878,15 @@ const handleSubmit = async () => {
   )}
 </div>
 
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={isSubmitting}
+                  className={`w-full mb-3 py-3 px-6 text-blue-700 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition flex items-center justify-center ${
+                    isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                   Save Draft
+                </button>
                 <button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
