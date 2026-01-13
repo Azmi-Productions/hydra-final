@@ -93,17 +93,18 @@ interface ListInputProps {
   items: string[];
   setItems: (items: string[]) => void;
   placeholder?: string;
+  inputValue: string;
+  setInputValue: (val: string) => void;
 }
 
-const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
-  const [input, setInput] = useState("");
+const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputValue }: ListInputProps) => {
 
   const safeItems = Array.isArray(items) ? items : [];
 
   const addItem = () => {
-    if (!input.trim()) return;
-    setItems([...safeItems, input.trim()]);
-    setInput("");
+    if (!inputValue.trim()) return;
+    setItems([...safeItems, inputValue.trim()]);
+    setInputValue("");
   };
 
   const removeItem = (index: number) => {
@@ -127,8 +128,8 @@ const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
           type="text"
           className="flex-1 p-3 border border-gray-300 rounded-xl bg-white text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           placeholder={placeholder}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
         />
         <button type="button" onClick={addItem} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">
@@ -167,6 +168,10 @@ export default function ReportSubmissionPage() {
   const [pipeUsage, setPipeUsage] = useState("");
   const [fittings, setFittings] = useState("");
   const [remarks, setRemarks] = useState("");
+  
+  // Pending inputs for lists
+  const [equipmentInput, setEquipmentInput] = useState("");
+  const [manpowerInput, setManpowerInput] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [gmapLink, setGmapLink] = useState("");
@@ -337,6 +342,7 @@ export default function ReportSubmissionPage() {
   };
 
 
+
   function selectActivity(activity: any) {
     setSelectedActivity(activity);
     setActivityId(activity.activity_id);
@@ -347,8 +353,20 @@ export default function ReportSubmissionPage() {
     setDate(activity.date || new Date().toISOString().slice(0,10));
     setDay(activity.day || new Date().toLocaleDateString("en-US", { weekday: "long" }));
     setDamageType(activity.damage_type || "");
-    setEquipmentList(Array.isArray(activity.equipment_used) ? activity.equipment_used : []);
-    setManpowerList(Array.isArray(activity.manpower_involved) ? activity.manpower_involved : []);
+    
+    // Ensure we handle potential stringified JSON if DB returns text
+    let eqList = activity.equipment_used;
+    if (typeof eqList === 'string') {
+        try { eqList = JSON.parse(eqList); } catch(e) { eqList = []; }
+    }
+    setEquipmentList(Array.isArray(eqList) ? eqList : []);
+
+    let manList = activity.manpower_involved;
+    if (typeof manList === 'string') {
+        try { manList = JSON.parse(manList); } catch(e) { manList = []; }
+    }
+    setManpowerList(Array.isArray(manList) ? manList : []);
+
     setExcavation(activity.excavation || "");
     setSand(activity.sand || "");
     setAggregate(activity.aggregate || "");
@@ -436,6 +454,21 @@ export default function ReportSubmissionPage() {
       // --- Update location ---
       getLocation(); // Try to update location for draft
 
+      // Capture pending inputs for Equipment and Manpower
+      const finalEquipmentList = [...equipmentList];
+      if (equipmentInput.trim()) {
+        finalEquipmentList.push(equipmentInput.trim());
+        setEquipmentList(finalEquipmentList);
+        setEquipmentInput("");
+      }
+
+      const finalManpowerList = [...manpowerList];
+      if (manpowerInput.trim()) {
+        finalManpowerList.push(manpowerInput.trim());
+        setManpowerList(finalManpowerList);
+        setManpowerInput("");
+      }
+
       const payload = {
         date,
         start_time: startTime,
@@ -444,8 +477,8 @@ export default function ReportSubmissionPage() {
         day,
         duration: finalDurationStr,
         damage_type: damageType,
-        equipment_used: equipmentList,
-        manpower_involved: manpowerList,
+        equipment_used: finalEquipmentList,
+        manpower_involved: finalManpowerList,
         excavation: excavation || null,
         sand: sand || null,
         aggregate: aggregate || null,
@@ -596,6 +629,24 @@ const handleSubmit = async () => {
     // --- Update location ---
     getLocation();
 
+    // --- Update location ---
+    getLocation();
+
+    // Capture pending inputs for Equipment and Manpower
+    const finalEquipmentList = [...equipmentList];
+    if (equipmentInput.trim()) {
+      finalEquipmentList.push(equipmentInput.trim());
+      setEquipmentList(finalEquipmentList);
+      setEquipmentInput("");
+    }
+
+    const finalManpowerList = [...manpowerList];
+    if (manpowerInput.trim()) {
+      finalManpowerList.push(manpowerInput.trim());
+      setManpowerList(finalManpowerList);
+      setManpowerInput("");
+    }
+
     const payload = {
       date,
       start_time: startTime,
@@ -603,8 +654,8 @@ const handleSubmit = async () => {
       day,
       duration: finalDurationStr,
       damage_type: damageType,
-      equipment_used: equipmentList,
-      manpower_involved: manpowerList,
+      equipment_used: finalEquipmentList,
+      manpower_involved: finalManpowerList,
       excavation: excavation || null,
       sand: sand || null,
       aggregate: aggregate || null,
@@ -789,8 +840,22 @@ const handleSubmit = async () => {
                   <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
                 </h2>
 
-                <ListInput label="Equipment Used" items={equipmentList} setItems={setEquipmentList} placeholder="Add equipment" />
-                <ListInput label="Manpower Involved" items={manpowerList} setItems={setManpowerList} placeholder="Add manpower" />
+                <ListInput 
+                  label="Equipment Used" 
+                  items={equipmentList} 
+                  setItems={setEquipmentList} 
+                  placeholder="Add equipment" 
+                  inputValue={equipmentInput}
+                  setInputValue={setEquipmentInput}
+                />
+                <ListInput 
+                  label="Manpower Involved" 
+                  items={manpowerList} 
+                  setItems={setManpowerList} 
+                  placeholder="Add manpower" 
+                  inputValue={manpowerInput}
+                  setInputValue={setManpowerInput}
+                />
                 <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
                 <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
                 <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
