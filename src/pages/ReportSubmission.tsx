@@ -193,7 +193,45 @@ export default function ReportSubmissionPage() {
       setDay(weekday);
     }
   }, [date]);
+const MAX_VIDEO_SIZE_MB = 15;
+const MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION = 20; // optional safety net
+const MAX_TOTAL_FILES = 5;
 
+const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    // Validate video size
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    }
+    // Optional: Block extremely large images (before compression)
+    else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Enforce total file count limit (uploaded + pending)
+  const totalFilesAfterAdd = uploadedPhotoUrls.length + photoFiles.length + newValidFiles.length;
+  if (totalFilesAfterAdd > MAX_TOTAL_FILES) {
+    toast.error(`You can only attach up to ${MAX_TOTAL_FILES} files in total.`);
+    return;
+  }
+
+  // Add valid files
+  setPhotoFiles(prev => [...prev, ...newValidFiles]);
+};
   const fetchStartedActivities = async () => {
     const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=eq.Started&submitted_by=eq.${username}`, {
       headers: {
@@ -538,7 +576,7 @@ const handleSubmit = async () => {
   }
 
   // --- Validation: Enforce all fields ---
-  if (!damageType || !remarks || !date || !startTime) {
+  if (!damageType  || !date || !startTime) {
       toast.error("Please fill in all required fields (Damage Type, Remarks).");
       return;
   }
@@ -550,37 +588,38 @@ const handleSubmit = async () => {
     let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
 
     if (photoFiles.length > 0) {
-      const uploadPromises = photoFiles.map(async (file) => {
-        try {
-          // Compression
-          const options = {
-            maxSizeMB: 1,
-            maxWidthOrHeight: 1920,
-            useWebWorker: true,
-          };
-          const compressedFile = await imageCompression(file, options);
-          
-          const formData = new FormData();
-          formData.append("file", compressedFile);
+     const uploadPromises = photoFiles.map(async (file) => {
+  try {
+    let finalFile = file;
 
-          const uploadRes = await fetch(
-            "https://azmiproductions.com/api/hydra/upload.php",
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
+    // Only compress images
+    if (file.type.startsWith('image/')) {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
+      finalFile = await imageCompression(file, options);
+    }
 
-          if (!uploadRes.ok) throw new Error("Upload failed");
-          
-          const data = await uploadRes.json();
-          return data.url;
-        } catch (error) {
-          console.error("Error uploading file:", error);
-          toast.error(`Failed to upload one of the images.`);
-          return null;
-        }
-      });
+    const formData = new FormData();
+    formData.append("file", finalFile);
+
+    const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadRes.ok) throw new Error("Upload failed");
+
+    const data = await uploadRes.json();
+    return data.url;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    toast.error(`Failed to upload: ${file.name}`);
+    return null;
+  }
+});
 
       const results = await Promise.all(uploadPromises);
       const successfulUploads = results.filter((url): url is string => url !== null);
@@ -886,19 +925,15 @@ const handleSubmit = async () => {
   </label>
 
   {/* Hidden native input */}
-  <input
-    id="file-upload"
-    type="file"
-    accept="image/*"
-    multiple
-    capture="environment"
-    onChange={(e) => {
-      const files = e.target.files;
-      if (!files) return;
-      setPhotoFiles((prevFiles) => [...prevFiles, ...Array.from(files)]);
-    }}
-    className="sr-only" 
-  />
+ <input
+  id="file-upload"
+  type="file"
+  accept="image/*,video/*"
+  multiple
+  capture="environment"
+  onChange={handleFileSelect} // ← use the new handler
+  className="sr-only"
+/>
 
   {/* --- 2. Photo Previews & Management --- */}
   {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
@@ -928,38 +963,58 @@ const handleSubmit = async () => {
         ))}
 
         {/* Newly Selected Files (Pending Upload) */}
-        {photoFiles.map((file, idx) => (
-          <div 
-            key={`file-${idx}`} 
-            className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
-            title={file.name}
-          >
-            <img 
-              src={URL.createObjectURL(file)} 
-              alt={`upload-${idx}`} 
-              className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105" 
-            />
-            
-            {/* Status Badge */}
-            <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
-                Pending...
-            </div>
-            
-            {/* Removal Button - Improved design */}
-            <button
-              type="button"
-              onClick={() => {
-                const newFiles = [...photoFiles];
-                newFiles.splice(idx, 1);
-                setPhotoFiles(newFiles);
-              }}
-              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              title="Remove file"
-            >
-              <Trash2 className="w-4 h-4" /> {/* Using Trash icon for removal */}
-            </button>
+        {/* Newly Selected Files (Pending Upload) */}
+{photoFiles.map((file, idx) => {
+  const isVideo = file.type.startsWith('video/');
+  const fileUrl = URL.createObjectURL(file);
+
+  return (
+    <div
+      key={`file-${idx}`}
+      className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
+      title={file.name}
+    >
+      {isVideo ? (
+        <div className="w-full h-24 bg-gray-800 flex items-center justify-center relative">
+          <video
+            src={fileUrl}
+            className="w-full h-full object-cover opacity-90"
+            muted
+            playsInline
+            poster="" // optional: add a poster later if needed
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <Play className="w-6 h-6 text-white" /> {/* You'll need to import Play */}
           </div>
-        ))}
+        </div>
+      ) : (
+        <img
+          src={fileUrl}
+          alt={`upload-${idx}`}
+          className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105"
+        />
+      )}
+
+      <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
+        {isVideo ? 'Video' : 'Image'}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          const newFiles = [...photoFiles];
+          newFiles.splice(idx, 1);
+          setPhotoFiles(newFiles);
+          URL.revokeObjectURL(fileUrl); // Clean up memory
+        }}
+        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700"
+        title="Remove file"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+})}
       </div>
     </div>
   )}
