@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft,Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 // --- Supabase REST API ---
