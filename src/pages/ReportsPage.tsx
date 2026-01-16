@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download,Play } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus } from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 
@@ -61,8 +61,97 @@ interface ModalProps {
 }
 
 const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
-  const [editableReport, setEditableReport] = useState<Report>({ ...report });
+  const [reports, setReports] = useState<Report[]>([report]);
+  const [activeReportIdx, setActiveReportIdx] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [supervisors, setSupervisors] = useState<{ id: number; username: string }[]>([]);
+  const [showAddSupervisor, setShowAddSupervisor] = useState(false);
+
+  // Use the currently active report for display/editing
+  const activeReport = reports[activeReportIdx] || report;
+
+  const [editableReport, setEditableReport] = useState<Report>({ ...activeReport });
   const [saving, setSaving] = useState(false);
+
+  // --- Fetch all reports for this activity ID ---
+  const fetchActivityReports = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?activity_id=eq.${report.activity_id}&select=*`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch activity reports");
+      const data: Report[] = await res.json();
+      setReports(data);
+       
+      // Reset editable to current active
+      // Find the one that matches the original passed 'report.id' if possible, or just stay at 0
+      const currentId = activeReport.id; 
+      const newIdx = data.findIndex(r => r.id === currentId);
+      if (newIdx !== -1) setActiveReportIdx(newIdx);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load all reports for this activity.");
+    }
+    setLoading(false);
+  };
+
+  // --- Fetch Supervisors for Dropdown ---
+  const fetchSupervisors = async () => {
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/adiav?role=eq.supervisor&select=id,username`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch supervisors");
+      const data = await res.json();
+      setSupervisors(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivityReports();
+    fetchSupervisors();
+  }, [report.activity_id]);
+
+  useEffect(() => {
+    // When switching tabs, update the editable state
+    setEditableReport({ ...reports[activeReportIdx] });
+  }, [activeReportIdx, reports]);
+
+  const handleAddSupervisor = async (username: string) => {
+     if (!confirm(`Assign ${username} to this activity?`)) return;
+     setSaving(true);
+     try {
+        const payload = {
+           activity_id: report.activity_id,
+           date: new Date().toISOString().slice(0, 10),
+           start_time: new Date().toTimeString().slice(0, 5),
+           day: new Date().toLocaleDateString("en-US", { weekday: "long" }),
+           status: 'Started',
+           submitted_by: username,
+           // Copy basic location/timing from original if available, or leave blank?
+           // Let's just init minimal
+           duration: 0
+        };
+
+        const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
+            method: 'POST', 
+            headers: { ...headers, "Prefer": "return=representation" },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to add supervisor");
+
+        toast.success(`Supervisor ${username} added!`);
+        setShowAddSupervisor(false);
+        fetchActivityReports(); // Reload tabs
+
+     } catch(e) {
+        console.error(e);
+        toast.error("Failed to add supervisor.");
+     } finally {
+        setSaving(false);
+     }
+  };
 
   const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
@@ -84,12 +173,16 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     setEditableReport(prev => ({ ...prev, [field]: finalValue } as any));
   };
 
+
+
+  // const handleDelete ... (Updated to handle deleting specific report from tab)
   const handleDelete = async () => {
+    const currentReport = reports[activeReportIdx];
     if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
 
     setSaving(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${report.id}`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${currentReport.id}`, {
         method: "DELETE",
         headers
       });
@@ -97,11 +190,17 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       if (!res.ok) throw new Error("Failed to delete report");
 
       toast.success("Report deleted successfully!");
-      onUpdate(null); // signal parent to remove this report
-      onClose();
+      
+      // If it was the last report, close modal
+      if (reports.length <= 1) {
+          onUpdate(null);
+          onClose();
+          window.location.reload();
+      } else {
+          // Just reload tabs
+          fetchActivityReports();
+      }
 
-      // Refresh the page (keeps behaviour consistent with existing code)
-      window.location.reload();
     } catch (err) {
       console.error(err);
       toast.error("Failed to delete report.");
@@ -111,34 +210,31 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   };
 
   const handleSave = async () => {
+    const currentReport = reports[activeReportIdx];
     setSaving(true);
     try {
-      // Use `any` type for `updates` to resolve type-checking when assigning null.
       const updates: { [key: string]: any } = {};
 
       (Object.keys(editableReport) as (keyof Report)[]).forEach(key => {
-        if (editableReport[key] !== report[key]) {
-          // Send `null` if the state value is `undefined` (cleared input), otherwise send the value.
+        if (editableReport[key] !== currentReport[key]) {
           updates[key] = editableReport[key] === undefined ? null : editableReport[key];
         }
       });
       
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${report.id}`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${currentReport.id}`, {
         method: "PATCH",
         headers: {
           ...headers,
-          "Prefer": "return=representation" // this tells Supabase to return the updated row(s)
+          "Prefer": "return=representation" 
         },
         body: JSON.stringify(updates),
       });
 
       if (!res.ok) throw new Error("Failed to update report");
 
-      const updatedData = await res.json(); // now safe to parse
-
-      onUpdate(updatedData[0] || editableReport); 
       toast.success("Changes saved successfully!");
-      onClose();
+      fetchActivityReports(); // Refresh tabs data
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to save changes.");
@@ -147,23 +243,24 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   };
 
   const handleStatusChange = async (status: "Approved" | "Rejected") => {
+    const currentReport = reports[activeReportIdx];
     setSaving(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${report.id}`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${currentReport.id}`, {
         method: "PATCH",
         headers: {
           ...headers,
           "Prefer": "return=representation"
         },
-        body: JSON.stringify({ status }), // or `updates` object
+        body: JSON.stringify({ status }),
       });
 
       if (!res.ok) throw new Error("Failed to update status");
       
-      const updatedData = await res.json();
-      onUpdate(updatedData[0] || { ...editableReport, status });
       toast.success(`Report ${status} successfully!`);
-      onClose();
+      // Update local state without full reload if possible, but fetching is safer
+      fetchActivityReports(); 
+
     } catch (err) {
       console.error(err);
       toast.error("Failed to change status.");
@@ -185,15 +282,67 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto transform transition duration-300">
         
         {/* Header */}
+        {/* Header */}
         <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center z-10">
-          <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
-            <FolderOpen className="w-6 h-6 mr-3 text-indigo-600" />
-            <span className="truncate">Report Review: {report.activity_id}</span>
-            
-          </h2>
+          <div>
+            <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
+                <FolderOpen className="w-6 h-6 mr-3 text-indigo-600" />
+                <span className="truncate">Report Review: {report.activity_id}</span>
+            </h2>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+                {reports.map((r, i) => (
+                    <button
+                        key={r.id}
+                        onClick={() => setActiveReportIdx(i)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+                            i === activeReportIdx 
+                            ? 'bg-indigo-600 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                        {r.submitted_by} 
+                        <span className={`ml-2 text-xs opacity-75 ${
+                            r.status === 'Approved' ? 'text-green-200' :
+                            r.status === 'Rejected' ? 'text-red-200' : ''
+                        }`}>({r.status})</span>
+                    </button>
+                ))}
+                
+                {/* Add Supervisor Button */}
+                <div className="relative">
+                    <button 
+                        onClick={() => setShowAddSupervisor(!showAddSupervisor)}
+                        className="px-2 py-1 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 flex items-center text-sm"
+                        title="Add Supervisor"
+                    >
+                        <UserPlus className="w-4 h-4 mr-1"/> Add
+                    </button>
+                    
+                    {showAddSupervisor && (
+                        <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-lg z-50 py-1">
+                            <p className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Assign Supervisor</p>
+                            {supervisors
+                                .filter(s => !reports.map(r => r.submitted_by).includes(s.username)) // Exclude existing
+                                .map(s => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => handleAddSupervisor(s.username)}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 bg-white"
+                                >
+                                    {s.username}
+                                </button>
+                            ))}
+                            {supervisors.filter(s => !reports.map(r => r.submitted_by).includes(s.username)).length === 0 && (
+                                <p className="px-4 py-2 text-sm text-gray-400 italic">No other supervisors.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+          </div>
           <button 
             onClick={onClose} 
-            className="text-gray-500 hover:text-gray-900 p-2 rounded-full transition hover:bg-gray-100"
+            className="text-gray-500 hover:text-gray-900 p-2 rounded-full transition hover:bg-gray-100 self-start"
             aria-label="Close"
           >
             <X className="w-6 h-6" />
@@ -201,6 +350,9 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         </div>
 
         {/* Body */}
+        {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-indigo-500 w-8 h-8"/></div>
+        ) : (
         <div className="p-8 space-y-8">
           
           {/* Status Badge */}
@@ -397,6 +549,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           </div>
 
         </div>
+        )}
       </div>
     </div>
   );
@@ -431,9 +584,9 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
         </h3>
         <p className="text-sm text-gray-500 ml-8 mt-1">
           <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
-           <p className="text-sm text-gray-500  mt-1">
-  Submitted by: <span className="font-medium">{report.submitted_by}</span>
-</p>
+        </p>
+        <p className="text-sm text-gray-500 ml-8 mt-1">
+           Submitted by: <span className="font-medium">{report.submitted_by}</span>
         </p>
       </div>
 
@@ -518,11 +671,49 @@ export default function ReportsListPage() {
   const fetchReports = async () => {
     setLoading(true);
     try {
+      // 1. Fetch all reports sorted by created_at desc
       const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&order=created_at.desc`, { headers });
       if (!res.ok) throw new Error("Failed to fetch");
       const data: Report[] = await res.json();
-      const reportsWithStatus = data.map((r) => ({ ...r, status: r.status || 'Pending' }));
-      setReports(reportsWithStatus);
+      
+      // 2. Group by activity_id -> picking the "most relevant" one for the list view
+      // We want to display ONE card per activity_id.
+      // Logic: If any report in the group is 'Pending', show as 'Pending'.
+      // If all are 'Approved', show 'Approved'. etc.
+      
+      const grouped: { [key: string]: Report[] } = {};
+      data.forEach(r => {
+        if (!grouped[r.activity_id]) grouped[r.activity_id] = [];
+        grouped[r.activity_id].push(r);
+      });
+
+      const uniqueActivityReports: Report[] = [];
+
+      Object.keys(grouped).forEach(actId => {
+          const group = grouped[actId];
+          // Determine "representative" report for list view
+          // Priority: Pending > Started > Approved > Rejected (or similar?)
+          // Actually, let's just pick the latest one, BUT override status if any is Pending
+          
+          const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
+          const hasStarted = group.some(r => r.status === 'Started');
+          const hasApproved = group.some(r => r.status === 'Approved'); // Maybe check if ALL are approved?
+          
+          // Let's use the layout of the latest report for details (date, damage type etc)
+          // But status should reflect if there is 'work to do' (Pending)
+          
+          const latest = group[0]; // Assuming sorted by desc
+          
+          let displayStatus = latest.status;
+          if (hasPending) displayStatus = 'Pending';
+          else if (hasStarted) displayStatus = 'Ongoing'; // Map Started -> Ongoing tab
+          else if (group.every(r => r.status === 'Approved')) displayStatus = 'Approved';
+          else if (group.every(r => r.status === 'Rejected')) displayStatus = 'Rejected';
+          
+          uniqueActivityReports.push({ ...latest, status: displayStatus });
+      });
+
+      setReports(uniqueActivityReports);
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch reports");
@@ -573,12 +764,12 @@ export default function ReportsListPage() {
     setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
   };
 
-  const startedReports = reports.filter(r => r.status === 'Started');
+  const startedReports = reports.filter(r => r.status === 'Ongoing');
   const pendingReports = reports.filter(r => r.status === 'Pending');
   const approvedReports = reports.filter(r => r.status === 'Approved');
   const rejectedReports = reports.filter(r => r.status === 'Rejected');
 
-  const itemsPerPage = 3;
+  const itemsPerPage = 5;
 
   const [pageStarted, setPageStarted] = useState(1);
   const [pagePending, setPagePending] = useState(1);

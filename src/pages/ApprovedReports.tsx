@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler, useCallback } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock,Play } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, Edit3, Loader2 } from 'lucide-react';
 import toast from "../utils/toast";
 
 // --- Supabase REST API Config from .env ---
@@ -58,10 +58,56 @@ interface ModalProps {
   onClose: () => void;
 }
 
-const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
-  // Modern input styling (read-only)
-  const inputStyle = "w-full border border-gray-300 p-2 rounded-lg text-sm bg-gray-50";
+const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpdate?: () => void }) => {
+  const [editableReport, setEditableReport] = useState<Report>({ ...report });
+  const [saving, setSaving] = useState(false);
+  const isRejected = report.status === 'Rejected';
+
+  // Modern input styling
+  // If rejected, allow editing (bg-white), else read-only (bg-gray-50)
+  const inputStyle = `w-full border border-gray-300 p-2 rounded-lg text-sm ${isRejected ? 'bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500' : 'bg-gray-50'}`;
   const labelStyle = "text-xs font-semibold text-gray-600 mb-1 block";
+
+  const handleChange = (field: keyof Report, value: string | number) => {
+    if (!isRejected) return;
+    setEditableReport(prev => ({ ...prev, [field]: value } as any));
+  };
+
+  const handleResubmit = async () => {
+    setSaving(true);
+    try {
+        const { id, ...updates } = editableReport;
+        
+        // Exclude fields that shouldn't be effectively changed or are strictly managed, if any.
+        // For now, we update the fields and set status to Pending.
+        
+        const payload = {
+            ...updates,
+            status: 'Pending'
+        };
+        
+        const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${report.id}`, {
+            method: "PATCH",
+            headers: {
+                ...headers,
+                "Prefer": "return=representation"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to resubmit report");
+
+        toast.success("Report resubmitted successfully!");
+        if (onUpdate) onUpdate();
+        onClose();
+
+    } catch (err) {
+        console.error(err);
+        toast.error("Failed to resubmit report");
+    } finally {
+        setSaving(false);
+    }
+  };
 
   // Section title style
   const sectionHeaderStyle = "text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center";
@@ -71,6 +117,7 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
   const getStatusBadge = (status: string) => {
     if (status === 'Approved') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-green-100 text-green-700";
     if (status === 'Pending') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-700";
+    if (status === 'Started') return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-blue-100 text-blue-700";
     return "inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full bg-gray-100 text-gray-700";
   };
 
@@ -121,24 +168,25 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
               </div>
             </div>
 
-            <div className="mt-6">
+              <div className="mt-6">
               <label className={labelStyle}>Damage Type</label>
               <input
                 type="text"
-                value={report.damage_type}
-                readOnly
+                value={editableReport.damage_type ?? ""}
+                onChange={(e) => handleChange("damage_type", e.target.value)}
+                readOnly={!isRejected}
                 className={inputStyle}
               />
             </div>
             <p className="mt-4 text-sm text-gray-600 flex items-center">
               <MapPin className="w-4 h-4 mr-1 text-red-500" />
-              Start Activity Location : {report.start_latitude ?? "N/A"}, {report.start_longitude ?? "N/A"}
-              {report.start_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={report.start_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
+              Start Activity Location : {editableReport.start_latitude ?? "N/A"}, {editableReport.start_longitude ?? "N/A"}
+              {editableReport.start_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.start_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
             </p>
             <p className="mt-4 text-sm text-gray-600 flex items-center">
               <MapPin className="w-4 h-4 mr-1 text-red-500" />
-              Final Report Location : {report.end_latitude ?? "N/A"}, {report.end_longitude ?? "N/A"}
-              {report.end_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={report.end_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
+              Final Report Location : {editableReport.end_latitude ?? "N/A"}, {editableReport.end_longitude ?? "N/A"}
+              {editableReport.end_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.end_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
             </p>
           </section>
 
@@ -148,11 +196,11 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className={labelStyle}>Equipment Used</label>
-                <input type="text" value={report.equipment_used} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.equipment_used ?? ""} onChange={(e) => handleChange("equipment_used", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div>
                 <label className={labelStyle}>Manpower Involved</label>
-                <input type="text" value={report.manpower_involved} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.manpower_involved ?? ""} onChange={(e) => handleChange("manpower_involved", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
             </div>
           </section>
@@ -163,27 +211,27 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className={labelStyle}>Excavation (m³)</label>
-                <input type="text" value={report.excavation ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.excavation ?? ""} onChange={(e) => handleChange("excavation", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Sand (m³)</label>
-                <input type="text" value={report.sand ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.sand ?? ""} onChange={(e) => handleChange("sand", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Aggregate (m³)</label>
-                <input type="text" value={report.aggregate ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.aggregate ?? ""} onChange={(e) => handleChange("aggregate", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Premix (kg)</label>
-                <input type="text" value={report.premix ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Pipe Usage (m)</label>
-                <input type="text" value={report.pipe_usage ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Fittings</label>
-                <input type="text" value={report.fittings ?? "N/A"} readOnly className={inputStyle} />
+                <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)} readOnly={!isRejected} className={inputStyle} />
               </div>
             </div>
           </section>
@@ -243,13 +291,28 @@ const ReportDetailsModal = ({ report, onClose }: ModalProps) => {
           {/* Remarks */}
           <section className="space-y-4 pt-4">
             <h3 className={sectionHeaderStyle}><Clock className={iconStyle} /> Final Remarks</h3>
-            <textarea
-              value={report.remarks ?? "No remarks provided"}
-              readOnly
+             <textarea
+              value={editableReport.remarks ?? ""}
+              onChange={(e) => handleChange("remarks", e.target.value)}
+              readOnly={!isRejected}
               rows={4}
               className={`${inputStyle} resize-y bg-yellow-50 border-yellow-200`}
             />
           </section>
+
+          {/* Action Buttons */}
+          {isRejected && (
+              <div className="flex justify-end pt-4">
+                  <button
+                      onClick={handleResubmit}
+                      disabled={saving}
+                      className="flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg transition font-bold"
+                  >
+                      {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Edit3 className="w-5 h-5 mr-2" />}
+                      Resubmit Report
+                  </button>
+              </div>
+          )}
 
         </div>
       </div>
@@ -270,6 +333,7 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
   const getStatusBadge = (status: string) => {
     if (status === 'Approved') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-green-500 text-white";
     if (status === 'Pending') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-yellow-500 text-white";
+    if (status === 'Started') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-blue-500 text-white";
     return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-gray-500 text-white";
   };
 
@@ -285,12 +349,12 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
           <MapPin className="w-5 h-5 mr-3 text-indigo-500" />
           {report.activity_id}
         </h3>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
+        <div className="text-sm text-gray-500 ml-8 mt-1">
           <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
            <p className="text-sm text-gray-500 mt-1">
   Submitted by: <span className="font-medium">{report.submitted_by}</span>
 </p>
-        </p>
+        </div>
       </div>
 
       {/* Right: Duration and Status */}
@@ -318,12 +382,12 @@ export default function ApprovedReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'Pending' | 'Approved'>('Pending');
+  const [activeTab, setActiveTab] = useState<'Pending' | 'Approved' | 'Rejected' | 'Ongoing'>('Ongoing');
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      let query = `${supabaseUrl}/rest/v1/reports?select=*&status=in.(Approved,Pending)&order=status.asc,created_at.desc`;
+      let query = `${supabaseUrl}/rest/v1/reports?select=*&status=in.(Approved,Pending,Rejected,Started)&order=status.asc,created_at.desc`;
       if (role === 'supervisor' && username) {
         query += `&submitted_by=eq.${username}`;
       }
@@ -371,6 +435,8 @@ export default function ApprovedReportsPage() {
   // Separate reports by status
   const pendingReports = reports.filter(r => r.status === 'Pending');
   const approvedReports = reports.filter(r => r.status === 'Approved');
+  const rejectedReports = reports.filter(r => r.status === 'Rejected');
+  const startedReports = reports.filter(r => r.status === 'Started');
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
@@ -379,7 +445,7 @@ export default function ApprovedReportsPage() {
         {/* Header */}
         <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300">
           <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            Report Status
+            Reports
           </h1>
           <p className="text-gray-500 mt-2 italic text-lg">
             {role === 'supervisor' ? 'View your report status including pending and approved reports.' : 'View all reports status including pending and approved reports.'} Click any report for detailed information.
@@ -400,8 +466,10 @@ export default function ApprovedReportsPage() {
              {/* Tab Navigation - Pill Style */}
              <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide px-4 pt-2 pb-2">
               {[
+                { key: 'Ongoing', label: 'Ongoing Actions', shortLabel: 'Ongoing', count: startedReports.length, bgColor: 'bg-blue-500', hoverColor: 'hover:bg-blue-600', textColor: 'text-white' },
                 { key: 'Pending', label: 'Pending Reports', shortLabel: 'Pending', count: pendingReports.length, bgColor: 'bg-yellow-500', hoverColor: 'hover:bg-yellow-600', textColor: 'text-white' },
                 { key: 'Approved', label: 'Approved Reports', shortLabel: 'Approved', count: approvedReports.length, bgColor: 'bg-green-500', hoverColor: 'hover:bg-green-600', textColor: 'text-white' },
+                { key: 'Rejected', label: 'Rejected Reports', shortLabel: 'Rejected', count: rejectedReports.length, bgColor: 'bg-red-500', hoverColor: 'hover:bg-red-600', textColor: 'text-white' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -430,6 +498,20 @@ export default function ApprovedReportsPage() {
 
             {/* Tab Content */}
             <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
+            
+            {/* Ongoing Reports Section */}
+            {activeTab === 'Ongoing' && (
+              <div className="p-6">
+                 {startedReports.length === 0 ? (
+                    <p className="text-gray-500 italic">No ongoing activities.</p>
+                 ) : (
+                  <div className="space-y-4">
+                    {startedReports.map(r => <ReportListItem key={r.id} report={{...r, status: 'Ongoing'}} onClick={() => handleReportClick(r)} />)}
+                  </div>
+                 )}
+              </div>
+            )}
+
             {/* Pending Reports Section */}
             {activeTab === 'Pending' && (
               <div className="p-6">
@@ -455,6 +537,19 @@ export default function ApprovedReportsPage() {
                  )}
               </div>
             )}
+
+            {/* Rejected Reports Section */}
+            {activeTab === 'Rejected' && (
+              <div className="p-6">
+                 {rejectedReports.length === 0 ? (
+                    <p className="text-gray-500 italic">No rejected reports.</p>
+                 ) : (
+                  <div className="space-y-4">
+                    {rejectedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                  </div>
+                 )}
+              </div>
+            )}
             </div>
           </div>
         )}
@@ -462,7 +557,7 @@ export default function ApprovedReportsPage() {
 
       {/* Modal Rendering */}
       {selectedReport && (
-        <ReportDetailsModal report={selectedReport} onClose={() => setSelectedReport(null)} />
+        <ReportDetailsModal report={selectedReport} onClose={() => setSelectedReport(null)} onUpdate={fetchReports} />
       )}
     </div>
   );

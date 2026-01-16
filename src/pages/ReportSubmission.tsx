@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2,Play } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 // --- Supabase REST API ---
@@ -38,6 +38,11 @@ const FormInput = ({ label, placeholder, type = 'text', value, onChange, readOnl
     <label className="text-sm font-medium text-gray-600 mb-1 block">{label}</label>
     <input
       type={type}
+      min={type === 'number' ? "0" : undefined}
+      onInput={type === 'number' ? (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.value && parseFloat(target.value) < 0) target.value = "0";
+      } : undefined}
       className={`w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${readOnly ? "bg-gray-100 cursor-not-allowed" : ""}`}
       placeholder={placeholder}
       value={value}
@@ -88,19 +93,22 @@ interface ListInputProps {
   items: string[];
   setItems: (items: string[]) => void;
   placeholder?: string;
+  inputValue: string;
+  setInputValue: (val: string) => void;
 }
 
-const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
-  const [input, setInput] = useState("");
+const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputValue }: ListInputProps) => {
+
+  const safeItems = Array.isArray(items) ? items : [];
 
   const addItem = () => {
-    if (!input.trim()) return;
-    setItems([...items, input.trim()]);
-    setInput("");
+    if (!inputValue.trim()) return;
+    setItems([...safeItems, inputValue.trim()]);
+    setInputValue("");
   };
 
   const removeItem = (index: number) => {
-    const newItems = [...items];
+    const newItems = [...safeItems];
     newItems.splice(index, 1);
     setItems(newItems);
   };
@@ -120,8 +128,8 @@ const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
           type="text"
           className="flex-1 p-3 border border-gray-300 rounded-xl bg-white text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           placeholder={placeholder}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
         />
         <button type="button" onClick={addItem} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">
@@ -129,7 +137,7 @@ const ListInput = ({ label, items, setItems, placeholder }: ListInputProps) => {
         </button>
       </div>
       <ul className="list-disc list-inside space-y-1">
-        {items.map((item, idx) => (
+        {safeItems.map((item, idx) => (
           <li key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
             {item}
             <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
@@ -160,6 +168,10 @@ export default function ReportSubmissionPage() {
   const [pipeUsage, setPipeUsage] = useState("");
   const [fittings, setFittings] = useState("");
   const [remarks, setRemarks] = useState("");
+  
+  // Pending inputs for lists
+  const [equipmentInput, setEquipmentInput] = useState("");
+  const [manpowerInput, setManpowerInput] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [gmapLink, setGmapLink] = useState("");
@@ -170,6 +182,7 @@ export default function ReportSubmissionPage() {
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   const username = getCookie("username") || "Unknown";
 
@@ -293,6 +306,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
   }
 
   // WAIT FOR LOCATION
+  setIsStarting(true);
   let lat = null;
   let lng = null;
   let link = null;
@@ -331,31 +345,43 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     submitted_by: username,
   };
 
-  const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
-      "Prefer": "return=representation",
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Prefer": "return=representation",
+        },
+        body: JSON.stringify(payload),
+      });
 
-  if (!res.ok) {
-    const err = await res.json();
-    console.error(err);
-    toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
-    return;
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
+        return;
+      }
+
+      const data = await res.json();
+      toast.success(`Activity ${activityId} started at ${timeStr}`);
+      fetchStartedActivities();
+      
+      if (data && data.length > 0) {
+        selectActivity(data[0]);
+      }
+  } catch (err) {
+      console.error(err);
+      toast.error("An error occurred while starting activity.");
+  } finally {
+      setIsStarting(false);
   }
-
-  toast.success(`Activity ${activityId} started at ${timeStr}`);
-  fetchStartedActivities();
-  window.location.reload();
-};
+  };
 
 
-  const selectActivity = (activity: any) => {
+
+  function selectActivity(activity: any) {
     setSelectedActivity(activity);
     setActivityId(activity.activity_id);
     setStartTime(activity.start_time);
@@ -365,8 +391,20 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDate(activity.date || new Date().toISOString().slice(0,10));
     setDay(activity.day || new Date().toLocaleDateString("en-US", { weekday: "long" }));
     setDamageType(activity.damage_type || "");
-    setEquipmentList(activity.equipment_used || []);
-    setManpowerList(activity.manpower_involved || []);
+    
+    // Ensure we handle potential stringified JSON if DB returns text
+    let eqList = activity.equipment_used;
+    if (typeof eqList === 'string') {
+        try { eqList = JSON.parse(eqList); } catch(e) { eqList = []; }
+    }
+    setEquipmentList(Array.isArray(eqList) ? eqList : []);
+
+    let manList = activity.manpower_involved;
+    if (typeof manList === 'string') {
+        try { manList = JSON.parse(manList); } catch(e) { manList = []; }
+    }
+    setManpowerList(Array.isArray(manList) ? manList : []);
+
     setExcavation(activity.excavation || "");
     setSand(activity.sand || "");
     setAggregate(activity.aggregate || "");
@@ -377,6 +415,158 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
     setUploadedPhotoUrls(activity.photo_link || []);
+  }
+
+  const handleSaveDraft = async () => {
+    if (!selectedActivity) {
+      toast.error("Select a started activity first.");
+      return;
+    }
+
+    // Skipped validation for Draft
+
+    setIsSubmitting(true);
+
+    try {
+      // --- Upload photos first (Parallel & Compressed) ---
+      let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
+
+      if (photoFiles.length > 0) {
+        const uploadPromises = photoFiles.map(async (file) => {
+          try {
+            // Compression
+            const options = {
+              maxSizeMB: 1,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+            };
+            const compressedFile = await imageCompression(file, options);
+            
+            const formData = new FormData();
+            formData.append("file", compressedFile);
+
+            const uploadRes = await fetch(
+              "https://azmiproductions.com/api/hydra/upload.php",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images.`);
+            return null;
+          }
+        });
+
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        photoLinks = [...photoLinks, ...successfulUploads];
+
+        // Clear local files after upload attempt
+        setUploadedPhotoUrls(photoLinks);
+        setPhotoFiles([]);
+      }
+
+      // --- Calculate Duration for Draft (optional, but good to have current snapshot) ---
+      const now = new Date();
+      const startDateTime = new Date(`${date}T${startTime}:00`);
+
+      if (isNaN(startDateTime.getTime())) {
+        startDateTime.setTime(now.getTime()); 
+      }
+      if (now < startDateTime) {
+        startDateTime.setDate(startDateTime.getDate() - 1);
+      }
+      let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+      if (isNaN(diffHours) || diffHours < 0.05) {
+        diffHours = 0.05;
+      }
+      const finalDurationStr = diffHours.toFixed(2);
+
+      // --- Update location ---
+      getLocation(); // Try to update location for draft
+
+      // Capture pending inputs for Equipment and Manpower
+      const finalEquipmentList = [...equipmentList];
+      if (equipmentInput.trim()) {
+        finalEquipmentList.push(equipmentInput.trim());
+        setEquipmentList(finalEquipmentList);
+        setEquipmentInput("");
+      }
+
+      const finalManpowerList = [...manpowerList];
+      if (manpowerInput.trim()) {
+        finalManpowerList.push(manpowerInput.trim());
+        setManpowerList(finalManpowerList);
+        setManpowerInput("");
+      }
+
+      const payload = {
+        date,
+        start_time: startTime,
+        // end_time: now.toTimeString().slice(0, 5), // Maybe don't set end_time for draft? Or set it? Let's update it as "current progress"
+        end_time: now.toTimeString().slice(0, 5),
+        day,
+        duration: finalDurationStr,
+        damage_type: damageType,
+        equipment_used: finalEquipmentList,
+        manpower_involved: finalManpowerList,
+        excavation: excavation || null,
+        sand: sand || null,
+        aggregate: aggregate || null,
+        premix: premix || null,
+        pipe_usage: pipeUsage || null,
+        fittings,
+        remarks,
+        end_latitude: latitude,
+        end_longitude: longitude,
+        end_gmap_link: gmapLink,
+        photo_link: photoLinks,
+        status: "Started", // IMPORTANT: Keep status as Started
+      };
+
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${selectedActivity.activity_id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`,
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error(err);
+        toast.error(`Save Draft Failed: ${err.message || "Unknown error"}`);
+        return;
+      }
+
+      toast.success(`Draft saved for ${activityId}!`);
+      
+      // Clear selection to go back to list view
+      setSelectedActivity(null);
+      setPhotoFiles([]);
+      setUploadedPhotoUrls([]);
+      
+      fetchStartedActivities();
+      
+    } catch (err) {
+      console.error(err);
+      toast.error("An error occurred during save draft.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 const handleSubmit = async () => {
@@ -442,6 +632,14 @@ const handleSubmit = async () => {
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
+    // Validate date and startTime presence
+    if (!date || !startTime) {
+       console.error("Missing Date or StartTime", date, startTime);
+       toast.error("Invalid Activity Start Time. Please restart activity.");
+       setIsSubmitting(false);
+       return;
+    }
+
     const startDateTime = new Date(`${date}T${startTime}:00`);
 
     if (isNaN(startDateTime.getTime())) {
@@ -470,6 +668,24 @@ const handleSubmit = async () => {
     // --- Update location ---
     getLocation();
 
+    // --- Update location ---
+    getLocation();
+
+    // Capture pending inputs for Equipment and Manpower
+    const finalEquipmentList = [...equipmentList];
+    if (equipmentInput.trim()) {
+      finalEquipmentList.push(equipmentInput.trim());
+      setEquipmentList(finalEquipmentList);
+      setEquipmentInput("");
+    }
+
+    const finalManpowerList = [...manpowerList];
+    if (manpowerInput.trim()) {
+      finalManpowerList.push(manpowerInput.trim());
+      setManpowerList(finalManpowerList);
+      setManpowerInput("");
+    }
+
     const payload = {
       date,
       start_time: startTime,
@@ -477,8 +693,8 @@ const handleSubmit = async () => {
       day,
       duration: finalDurationStr,
       damage_type: damageType,
-      equipment_used: equipmentList,
-      manpower_involved: manpowerList,
+      equipment_used: finalEquipmentList,
+      manpower_involved: finalManpowerList,
       excavation: excavation || null,
       sand: sand || null,
       aggregate: aggregate || null,
@@ -533,9 +749,25 @@ const handleSubmit = async () => {
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto">
         <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300">
-          <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            Report Submission
-          </h1>
+
+          <div className="flex items-center gap-3">
+            {selectedActivity && (
+              <button
+                onClick={() => {
+                  setSelectedActivity(null);
+                  setPhotoFiles([]);
+                  setUploadedPhotoUrls([]);
+                }}
+                className="p-2 rounded-full hover:bg-gray-200 transition-colors"
+                title="Back to Activity List"
+              >
+                <ArrowLeft className="w-6 h-6 text-gray-700" />
+              </button>
+            )}
+            <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
+              Report Submission
+            </h1>
+          </div>
           <p className="text-gray-500 mt-2 italic text-lg">
             Start activity or select a started activity to complete the report.
           </p>
@@ -601,7 +833,7 @@ const handleSubmit = async () => {
                 <div className="hidden">
   <FormInput label="Latitude" placeholder="Latitude" value={latitude ?? ""} readOnly />
   <FormInput label="Longitude" placeholder="Longitude" value={longitude ?? ""} readOnly />
-  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink} readOnly />
+  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink ?? ""} readOnly />
 </div>
 
                 
@@ -616,6 +848,9 @@ const handleSubmit = async () => {
                 )}
               </div>
             </div>
+            
+
+
 
             {selectedActivity && (
               <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
@@ -623,13 +858,13 @@ const handleSubmit = async () => {
                   <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date} onChange={(e) => setDate(e.target.value)} readOnly />
-                  <FormInput label="Start Time" placeholder="Auto" value={startTime} readOnly />
-                  <FormInput label="End Time" placeholder="Auto" value={endTime} readOnly />
+                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                  <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
+                  <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <FormInput label="Day" placeholder="Auto-calculated" value={day} readOnly />
-                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration} readOnly />
+                  <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
+                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                 </div>
                 <hr className="border-gray-100 pt-3" />
                 <FormInput label="Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
@@ -644,14 +879,28 @@ const handleSubmit = async () => {
                   <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
                 </h2>
 
-                <ListInput label="Equipment Used" items={equipmentList} setItems={setEquipmentList} placeholder="Add equipment" />
-                <ListInput label="Manpower Involved" items={manpowerList} setItems={setManpowerList} placeholder="Add manpower" />
-                <FormInput label="Excavation (m³)" placeholder="Excavation quantity" value={excavation} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Sand (m³)" placeholder="Sand quantity" value={sand} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Aggregate (m³)" placeholder="Aggregate quantity" value={aggregate} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Premix (m³)" placeholder="Premix quantity" value={premix} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Pipe Usage (m)" placeholder="Pipe usage" value={pipeUsage} onChange={(e) => setPipeUsage(e.target.value)} />
-                <FormInput label="Fittings" placeholder="Fittings" value={fittings} onChange={(e) => setFittings(e.target.value)} />
+                <ListInput 
+                  label="Equipment Used" 
+                  items={equipmentList} 
+                  setItems={setEquipmentList} 
+                  placeholder="Add equipment" 
+                  inputValue={equipmentInput}
+                  setInputValue={setEquipmentInput}
+                />
+                <ListInput 
+                  label="Manpower Involved" 
+                  items={manpowerList} 
+                  setItems={setManpowerList} 
+                  placeholder="Add manpower" 
+                  inputValue={manpowerInput}
+                  setInputValue={setManpowerInput}
+                />
+                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
+                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
+                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
+                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
+                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
+                <FormInput label="Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
                 {/* Photo Upload */}
@@ -772,6 +1021,15 @@ const handleSubmit = async () => {
 </div>
 
                 <button
+                  onClick={handleSaveDraft}
+                  disabled={isSubmitting}
+                  className={`w-full mb-3 py-3 px-6 text-blue-700 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition flex items-center justify-center ${
+                    isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                   Save Draft
+                </button>
+                <button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
                   className={`w-full mt-4 py-3 px-6 text-white font-semibold rounded-xl transition flex items-center justify-center ${
@@ -791,6 +1049,17 @@ const handleSubmit = async () => {
           )}
         </div>
       </div>
+      
+      {/* Loading Overlay */}
+      {isStarting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex flex-col items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 flex flex-col items-center shadow-2xl max-w-sm w-full text-center">
+             <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+             <h3 className="text-xl font-bold text-gray-900 mb-2">Starting Activity...</h3>
+             <p className="text-gray-600">Please wait while we create the activity report.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
