@@ -1,6 +1,6 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft,Play } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 // --- Supabase REST API ---
@@ -867,7 +867,7 @@ const handleSubmit = async () => {
                   <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                 </div>
                 <hr className="border-gray-100 pt-3" />
-                <FormInput label="Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+                <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
               </div>
             )}
           </div>
@@ -880,7 +880,7 @@ const handleSubmit = async () => {
                 </h2>
 
                 <ListInput 
-                  label="Equipment Used" 
+                  label="Peralatan Digunakan / Equipment Used" 
                   items={equipmentList} 
                   setItems={setEquipmentList} 
                   placeholder="Add equipment" 
@@ -888,19 +888,19 @@ const handleSubmit = async () => {
                   setInputValue={setEquipmentInput}
                 />
                 <ListInput 
-                  label="Manpower Involved" 
+                  label="Tenaga Kerja / Manpower Involved" 
                   items={manpowerList} 
                   setItems={setManpowerList} 
                   placeholder="Add manpower" 
                   inputValue={manpowerInput}
                   setInputValue={setManpowerInput}
                 />
-                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
-                <FormInput label="Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
+                <FormInput label="Ukuran Galian / Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
+                <FormInput label="Ukuran Pasir / Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
+                <FormInput label="Ukuran Batu Pecah / Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
+                <FormInput label="Ukuran Premix / Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
+                <FormInput label="Ukuran Paip / Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
+                <FormInput label="Ukuran Pemasangan / Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
                 {/* Photo Upload */}

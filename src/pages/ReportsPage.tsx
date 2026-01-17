@@ -176,13 +176,16 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
 
   // const handleDelete ... (Updated to handle deleting specific report from tab)
-  const handleDelete = async () => {
-    const currentReport = reports[activeReportIdx];
+  const handleDelete = async (reportId?: number) => {
+    // If no specific ID passed, use current (fallback for main delete button)
+    const targetId = reportId ?? reports[activeReportIdx].id;
+    const isCurrentActive = targetId === reports[activeReportIdx].id;
+
     if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
 
     setSaving(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${currentReport.id}`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${targetId}`, {
         method: "DELETE",
         headers
       });
@@ -197,7 +200,19 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           onClose();
           window.location.reload();
       } else {
-          // Just reload tabs
+          // If we deleted the currently active report, switch to another one
+          if (isCurrentActive) {
+              const deletedIdx = reports.findIndex(r => r.id === targetId);
+              // Try to go to previous, or 0 if we were at 0
+              const nextIdx = deletedIdx > 0 ? deletedIdx - 1 : 0;
+              // We can't set activeReportIdx immediately to a safe value because reports state is old
+              // But fetchActivityReports will refresh content. 
+              // However, we should be careful about the momentary 404 or index out of bounds.
+              // Let's rely on fetchActivityReports logic (it handles some index drift) 
+              // BUT we should probably anticipate the shift.
+              setActiveReportIdx(Math.max(0, nextIdx));
+          }
+          // Reload tabs
           fetchActivityReports();
       }
 
@@ -291,21 +306,32 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             </h2>
             <div className="mt-4 flex flex-wrap items-center gap-2">
                 {reports.map((r, i) => (
-                    <button
-                        key={r.id}
-                        onClick={() => setActiveReportIdx(i)}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                            i === activeReportIdx 
-                            ? 'bg-indigo-600 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                    >
-                        {r.submitted_by} 
-                        <span className={`ml-2 text-xs opacity-75 ${
-                            r.status === 'Approved' ? 'text-green-200' :
-                            r.status === 'Rejected' ? 'text-red-200' : ''
-                        }`}>({r.status})</span>
-                    </button>
+                    <div key={r.id} className="relative group">
+                        <button
+                            onClick={() => setActiveReportIdx(i)}
+                            className={`px-3 py-1 pr-6 rounded-full text-sm font-medium transition ${
+                                i === activeReportIdx 
+                                ? 'bg-indigo-600 text-white shadow-md' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            {r.submitted_by} 
+                            <span className={`ml-2 text-xs opacity-75 ${
+                                r.status === 'Approved' ? 'text-green-200' :
+                                r.status === 'Rejected' ? 'text-red-200' : ''
+                            }`}>({r.status})</span>
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(r.id);
+                            }}
+                            className={`absolute top-0 right-0 -mr-1 -mt-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50`}
+                            title="Remove Report"
+                        >
+                            <XCircle className="w-4 h-4 text-red-500" />
+                        </button>
+                    </div>
                 ))}
                 
                 {/* Add Supervisor Button */}
@@ -516,7 +542,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-6">
             <button 
-              onClick={handleDelete} 
+              onClick={() => handleDelete()} 
               disabled={saving}
               className={`flex items-center px-5 py-2.5 rounded-xl transition font-semibold text-white ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-md'}`}
             >
