@@ -895,11 +895,11 @@ const handleSubmit = async () => {
                   inputValue={manpowerInput}
                   setInputValue={setManpowerInput}
                 />
-                <FormInput label="Ukuran Galian / Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Ukuran Pasir / Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Ukuran Batu Pecah / Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Ukuran Premix / Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Ukuran Paip / Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
+                <FormInput label="Ukuran Galian / Excavation (m³)" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
+                <FormInput label="Ukuran Pasir / Sand (m³)" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
+                <FormInput label="Ukuran Batu Pecah / Aggregate (m³)" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
+                <FormInput label="Ukuran Premix / Premix (m³)" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
+                <FormInput label="Ukuran Paip / Pipe Usage (m)" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
                 <FormInput label="Ukuran Pemasangan / Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
