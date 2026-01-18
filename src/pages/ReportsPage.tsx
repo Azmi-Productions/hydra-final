@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus, Play } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 
@@ -723,7 +723,7 @@ export default function ReportsListPage() {
           
           const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
           const hasStarted = group.some(r => r.status === 'Started');
-          const hasApproved = group.some(r => r.status === 'Approved'); // Maybe check if ALL are approved?
+          
           
           // Let's use the layout of the latest report for details (date, damage type etc)
           // But status should reflect if there is 'work to do' (Pending)
