@@ -150,6 +150,54 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
   );
 };
 
+// --- Dimension Input Component ---
+interface DimensionInputProps {
+  label: string;
+  value: string | number;
+  onChange: (val: string) => void;
+}
+
+const DimensionInput = ({ label, value, onChange }: DimensionInputProps) => {
+  const strVal = String(value || "");
+  // Split by 'x' (case-insensitive) to get parts
+  const parts = strVal.toLowerCase().split('x');
+  const val1 = parts[0] || "";
+  const val2 = parts[1] || "";
+
+  const update = (v1: string, v2: string) => {
+    // If both empty, clear it
+    if (!v1 && !v2) {
+      onChange("");
+      return;
+    }
+    // format as v1xv2
+    onChange(`${v1}x${v2}`);
+  };
+
+  return (
+    <div className="relative">
+      <label className="text-sm font-medium text-gray-600 mb-1 block">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          className="w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          placeholder="L"
+          value={val1}
+          onChange={(e) => update(e.target.value, val2)}
+        />
+        <span className="text-gray-500 font-bold">X</span>
+        <input
+          type="number"
+          className="w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          placeholder="W"
+          value={val2}
+          onChange={(e) => update(val1, e.target.value)}
+        />
+      </div>
+    </div>
+  );
+};
+
 // --- Main Page ---
 export default function ReportSubmissionPage() {
   const [activityId, setActivityId] = useState("");
@@ -895,10 +943,10 @@ const handleSubmit = async () => {
                   inputValue={manpowerInput}
                   setInputValue={setManpowerInput}
                 />
-                <FormInput label="Ukuran Galian / Excavation (m³)" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Ukuran Pasir / Sand (m³)" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Ukuran Batu Pecah / Aggregate (m³)" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Ukuran Premix / Premix (m³)" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
+                <DimensionInput label="Ukuran Galian / Excavation (m³)" value={excavation ?? ""} onChange={setExcavation} />
+                <DimensionInput label="Ukuran Pasir / Sand (m³)" value={sand ?? ""} onChange={setSand} />
+                <DimensionInput label="Ukuran Batu Pecah / Aggregate (m³)" value={aggregate ?? ""} onChange={setAggregate} />
+                <DimensionInput label="Ukuran Premix / Premix (m³)" value={premix ?? ""} onChange={setPremix} />
                 <FormInput label="Ukuran Paip / Pipe Usage (m)" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
                 <FormInput label="Ukuran Pemasangan / Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
                 <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
