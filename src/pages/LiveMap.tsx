@@ -27,44 +27,59 @@ const LiveDeviceMap = () => {
   const [selectedLocation, setSelectedLocation] = useState<DeviceLocation | null>(null);
   const mapRef = useRef<MapRef>(null);
 
-  // Fly to location on click
   const flyToLocation = (lat: number, lng: number) => {
     mapRef.current?.flyTo({ center: [lng, lat], zoom: 14, pitch: 0, duration: 2000 });
   };
 
-
   const fetchLocations = async () => {
     try {
-      setLoading((prev) => prev && true); // Only show loading spinner on initial load
-      const res = await fetch(
-        `${SUPABASE_URL}/${TABLE}?select=id,device_id,alias,latitude,longitude,timestamp&order=timestamp.asc`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
+      let allData: DeviceLocation[] = [];
+      let hasMore = true;
+      let offset = 0;
+      const limit = 1000;
+
+      // Recursive fetch to handle table > 1000 rows
+      while (hasMore) {
+        const res = await fetch(
+          `${SUPABASE_URL}/${TABLE}?select=id,device_id,alias,latitude,longitude,timestamp&order=timestamp.asc&offset=${offset}&limit=${limit}`,
+          {
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              Range: `${offset}-${offset + limit - 1}`,
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+        const data: DeviceLocation[] = await res.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          allData = [...allData, ...data];
+          offset += limit;
         }
-      );
 
-      const data = await res.json();
+        if (!Array.isArray(data) || data.length < limit) {
+          hasMore = false;
+        }
+      }
 
-      if (!Array.isArray(data)) {
-        console.error("Supabase returned an error:", data);
-        toast.error("Failed to load device locations.");
+      if (allData.length === 0) {
+        if (loading) setLoading(false);
         return;
       }
 
-      // Build latest location per device
       const latestMap = new Map<string, DeviceLocation>();
       const aliasMap: Record<string, string> = {};
 
-      data.forEach((item: DeviceLocation) => {
-        // store alias if exists
+      allData.forEach((item: DeviceLocation) => {
         if (item.alias && item.alias.trim() !== "") {
           aliasMap[item.device_id] = item.alias;
         }
 
         const existing = latestMap.get(item.device_id);
+        // Ensure we only keep the absolute newest record found in the database
         if (!existing || new Date(item.timestamp) > new Date(existing.timestamp)) {
           latestMap.set(item.device_id, item);
         }
@@ -72,12 +87,10 @@ const LiveDeviceMap = () => {
 
       setLatestLocations(Array.from(latestMap.values()));
       setDeviceAliases(aliasMap);
-      
-      // If we are getting the first load, turn off loading
       if (loading) setLoading(false);
 
     } catch (err) {
-      console.error("Error fetching device locations:", err);
+      console.error("Error:", err);
       toast.error("Error fetching device locations.");
       setLoading(false);
     }
@@ -85,11 +98,10 @@ const LiveDeviceMap = () => {
 
   useEffect(() => {
     fetchLocations();
-    const interval = setInterval(fetchLocations, 60000); // refresh every 60s
+    const interval = setInterval(fetchLocations, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Save alias for a device
   const saveAlias = async (deviceId: string) => {
     const newAlias = aliasEdits[deviceId];
     if (!newAlias || newAlias.trim() === "") return;
@@ -106,18 +118,16 @@ const LiveDeviceMap = () => {
     });
 
     if (!res.ok) {
-      console.error("Failed to save alias");
       toast.error("Failed to save alias.");
       return;
     }
 
     toast.success("Alias saved successfully!");
-
     setDeviceAliases({ ...deviceAliases, [deviceId]: newAlias });
     setAliasEdits({ ...aliasEdits, [deviceId]: "" });
+    fetchLocations();
   };
 
-  // Responsive icon size logic - simplified for MapLibre
   const isMobile = window.innerWidth < 460;
   const iconSize = isMobile ? 30 : 50;
 
@@ -125,12 +135,11 @@ const LiveDeviceMap = () => {
     <div className="w-full h-screen p-6 bg-gray-50 flex flex-col">
       <div className="flex-1 w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200 relative">
         
-        {/* Loading Overlay */}
         {loading && (
           <div className="absolute inset-0 z-[1000] bg-white/80 flex items-center justify-center backdrop-blur-sm">
             <div className="flex flex-col items-center">
                <Loader2 className="animate-spin h-12 w-12 text-indigo-600 mb-3" />
-               <p className="text-gray-600 font-medium">Loading device locations...</p>
+               <p className="text-gray-600 font-medium">Updating map data...</p>
             </div>
           </div>
         )}
@@ -141,22 +150,18 @@ const LiveDeviceMap = () => {
                 longitude: 101.686,
                 latitude: 3.139,
                 zoom: 11,
-                pitch: 0,
-                bearing: 0,
             }}
             style={{width: '100%', height: '100%', borderRadius: "1.5rem"}}
             mapStyle="https://tiles.openfreemap.org/styles/bright"
             mapLib={maplibregl}
-            terrain={{source: 'mapbox-dem', exaggeration: 1.5}}
         >
             <GeolocateControl position="top-left" />
             <NavigationControl position="top-left" />
             <ScaleControl position="bottom-right" />
 
-            {/* Markers */}
             {latestLocations.map((loc) => (
                 <Marker
-                    key={loc.id}
+                    key={loc.device_id}
                     longitude={loc.longitude}
                     latitude={loc.latitude}
                     anchor="bottom"
@@ -168,10 +173,8 @@ const LiveDeviceMap = () => {
                     style={{ cursor: 'pointer' }}
                 >
                     <div className="relative group">
-                        {/* Pulsing Beacon Effect */}
                         <div className="absolute -inset-4 bg-indigo-500/30 rounded-full blur-md animate-pulse"></div>
                         <div className="absolute -inset-1 bg-indigo-400/50 rounded-full animate-ping opacity-75"></div>
-                        
                         <img 
                             src="https://www.freeiconspng.com/uploads/device-mobile-phone-icon--small--flat-iconset--paomedia-8.png" 
                             alt="Device"
@@ -179,7 +182,6 @@ const LiveDeviceMap = () => {
                             className="relative z-10 transform transition-transform hover:scale-110 drop-shadow-2xl"
                         />
                     </div>
-                     {/* Label for alias if exists - optional polish */}
                      {deviceAliases[loc.device_id] && (
                         <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white/90 px-2 py-0.5 rounded text-xs font-bold shadow-sm border border-gray-200 whitespace-nowrap">
                             {deviceAliases[loc.device_id]}
@@ -188,7 +190,6 @@ const LiveDeviceMap = () => {
                 </Marker>
             ))}
 
-            {/* Popup */}
             {selectedLocation && (
                 <Popup
                     longitude={selectedLocation.longitude}
@@ -229,12 +230,12 @@ const LiveDeviceMap = () => {
                         </div>
 
                         <div className="text-xs text-gray-500 mt-1 pt-2 border-t border-gray-100">
-                            Last update: {new Date(selectedLocation.timestamp).toLocaleString()}
+                            {/* DAY/MONTH/YEAR format applied here */}
+                            Last update: {new Date(selectedLocation.timestamp).toLocaleString("en-GB")}
                         </div>
                     </div>
                 </Popup>
             )}
-
         </ReactMap>
       </div>
     </div>
