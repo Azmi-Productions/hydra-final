@@ -181,7 +181,9 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     const targetId = reportId ?? reports[activeReportIdx].id;
     const isCurrentActive = targetId === reports[activeReportIdx].id;
 
-    if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
+    // Use custom toast confirmation
+    const confirmed = await toast.confirm("Are you sure you want to delete this report?");
+    if (!confirmed) return;
 
     setSaving(true);
     try {
