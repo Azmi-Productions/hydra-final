@@ -2,6 +2,7 @@ import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
 import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -150,6 +151,8 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
   );
 };
 
+// DimensionInput component has been moved to ../components/DimensionInput.tsx
+
 // --- Main Page ---
 export default function ReportSubmissionPage() {
   const [activityId, setActivityId] = useState("");
@@ -161,10 +164,10 @@ export default function ReportSubmissionPage() {
   const [damageType, setDamageType] = useState("");
   const [equipmentList, setEquipmentList] = useState<string[]>([]);
   const [manpowerList, setManpowerList] = useState<string[]>([]);
-  const [excavation, setExcavation] = useState("");
-  const [sand, setSand] = useState("");
-  const [aggregate, setAggregate] = useState("");
-  const [premix, setPremix] = useState("");
+  const [excavation, setExcavation] = useState<Dimensions | null>(null);
+  const [sand, setSand] = useState<Dimensions | null>(null);
+  const [aggregate, setAggregate] = useState<Dimensions | null>(null);
+  const [premix, setPremix] = useState<Dimensions | null>(null);
   const [pipeUsage, setPipeUsage] = useState("");
   const [fittings, setFittings] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -405,10 +408,46 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     }
     setManpowerList(Array.isArray(manList) ? manList : []);
 
-    setExcavation(activity.excavation || "");
-    setSand(activity.sand || "");
-    setAggregate(activity.aggregate || "");
-    setPremix(activity.premix || "");
+    // Helper to parse potential string or object dimensions
+    const parseDimensions = (val: any): Dimensions | null => {
+        if (!val) return null;
+        if (typeof val === 'object') {
+            return {
+                length: val.length || "",
+                width: val.width || "",
+                depth: val.depth || ""
+            };
+        }
+        if (typeof val === 'string') {
+             // Try to parse JSON first
+             try {
+                const parsed = JSON.parse(val);
+                if(typeof parsed === 'object') {
+                     return {
+                        length: parsed.length || "",
+                        width: parsed.width || "",
+                        depth: parsed.depth || ""
+                     };
+                }
+             } catch(e) {
+                 // Ignore
+             }
+
+            // Fallback to "LxWxD" string parsing
+            const parts = val.toLowerCase().split('x');
+            return {
+                length: parts[0] || "",
+                width: parts[1] || "",
+                depth: parts[2] || ""
+            };
+        }
+        return null;
+    };
+
+    setExcavation(parseDimensions(activity.excavation));
+    setSand(parseDimensions(activity.sand));
+    setAggregate(parseDimensions(activity.aggregate));
+    setPremix(parseDimensions(activity.premix));
     setPipeUsage(activity.pipe_usage || "");
     setFittings(activity.fittings || "");
     setRemarks(activity.remarks || "");
@@ -895,13 +934,49 @@ const handleSubmit = async () => {
                   inputValue={manpowerInput}
                   setInputValue={setManpowerInput}
                 />
-                <FormInput label="Ukuran Galian / Excavation (m³)" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Ukuran Pasir / Sand (m³)" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Ukuran Batu Pecah / Aggregate (m³)" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Ukuran Premix / Premix (m³)" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Ukuran Paip / Pipe Usage (m)" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
-                <FormInput label="Ukuran Pemasangan / Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
-                <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                {/* Materials */}
+            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4 mt-8 flex items-center">
+               <Briefcase className="w-5 h-5 mr-2 text-blue-600" />
+               Materials Quantities
+            </h3>
+
+            <div className="space-y-4">
+               <DimensionInput
+                  label="Excavation (m³)"
+                  value={excavation}
+                  onChange={setExcavation}
+               />
+               <DimensionInput
+                  label="Sand (m³)"
+                  value={sand}
+                  onChange={setSand}
+               />
+               <DimensionInput
+                  label="Aggregate (m³)"
+                  value={aggregate}
+                  onChange={setAggregate}
+               />
+                <DimensionInput
+                  label="Premix (kg)"
+                  value={premix}
+                  onChange={setPremix}
+                  showDepth={false}
+               />
+               <FormInput
+                label="Pipe Usage (m)"
+                placeholder="e.g. 5"
+                type="number"
+                value={pipeUsage}
+                onChange={(e) => setPipeUsage(e.target.value)}
+              />
+              <FormInput
+                label="Fittings"
+                placeholder="e.g. Coupling, Elbow"
+                value={fittings}
+                onChange={(e) => setFittings(e.target.value)}
+              />
+            </div>
+            <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
                 {/* Photo Upload */}
                 <div className="mt-4">
