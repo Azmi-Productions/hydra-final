@@ -26,6 +26,7 @@ function AppWrapper() {
         <Routes>
           {/* Public Login */}
           <Route path="/" element={<Login />} />
+          
 
           {/* Reports Page (Admin + Superadmin) */}
           <Route
