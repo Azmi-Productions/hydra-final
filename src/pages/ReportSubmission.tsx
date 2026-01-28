@@ -103,8 +103,12 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
   const safeItems = Array.isArray(items) ? items : [];
 
   const addItem = () => {
-    if (!inputValue.trim()) return;
-    setItems([...safeItems, inputValue.trim()]);
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue === "") {
+      // Don't add empty items
+      return;
+    }
+    setItems([...safeItems, trimmedValue]);
     setInputValue("");
   };
 
@@ -133,7 +137,16 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
         />
-        <button type="button" onClick={addItem} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={!inputValue.trim()}
+          className={`px-4 py-2 font-semibold rounded-xl transition ${
+            inputValue.trim()
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
           Add
         </button>
       </div>
