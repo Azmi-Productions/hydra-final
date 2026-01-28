@@ -3,7 +3,7 @@ import toast from "../utils/toast";
 import { MapPin, Calendar, Briefcase, Camera, X, Loader2, ArrowLeft } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
-import { MaintenanceReportTemplate } from './MaintenanceReport';
+
 
 // Maintenance categories with English/Malay labels
 const MAINTENANCE_CATEGORIES = [
@@ -1266,54 +1266,7 @@ const handleSubmit = async () => {
           </p>
         </header>
 
-        {startedActivities.length > 0 && !selectedActivity && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-blue-700 mb-4">Started Activities</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {startedActivities.map((act, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white border border-gray-200 rounded-2xl shadow-md p-4 hover:shadow-xl transition cursor-pointer"
-                  onClick={() => selectActivity(act)}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-blue-600">{act.activity_id}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">{act.start_time}</span>
-                      <button 
-                        onClick={(e) => deleteActivity(e, act.activity_id)}
-                        className="p-1 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition"
-                        title="Cancel/Delete Activity"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {act.damage_type && (
-                    <p className="text-gray-700 text-sm mb-2">
-                      <span className="font-medium">Damage:</span> {act.damage_type}
-                    </p>
-                  )}
-                  {act.start_gmap_link && (
-                    <a
-                      href={act.start_gmap_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 text-sm hover:underline truncate block"
-                    >
-                      View Location
-                    </a>
-                  )}
-                  <div className="mt-2 text-right">
-                    <button className="text-white bg-blue-600 px-3 py-1 rounded-xl text-sm hover:bg-blue-700 transition">
-                      Select
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Tabs moved to top, outside the grid */}
         {selectedActivity && (
@@ -1385,6 +1338,43 @@ const handleSubmit = async () => {
                         </div>
                       )}
                   </div>
+
+                  {/* RIGHT COLUMN: Started Activities Overview (When nothing selected) */}
+                  {!selectedActivity && startedActivities.length > 0 && (
+                     <div className="xl:col-span-1 space-y-6">
+                        <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                           <h2 className="text-lg font-semibold text-blue-700 border-b pb-2">Started Activities</h2>
+                           <div className="flex flex-col gap-4">
+                             {startedActivities.map((act, idx) => (
+                               <div
+                                 key={idx}
+                                 className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 hover:shadow-md transition cursor-pointer flex flex-col gap-2"
+                                 onClick={() => selectActivity(act)}
+                               >
+                                  <div className="flex justify-between items-start">
+                                     <span className="font-bold text-blue-600">{act.activity_id}</span>
+                                     <button 
+                                       onClick={(e) => { e.stopPropagation(); deleteActivity(e, act.activity_id); }}
+                                       className="p-1 rounded-full text-gray-400 hover:text-red-500 transition"
+                                     >
+                                       <X className="w-4 h-4" />
+                                     </button>
+                                  </div>
+                                  <div className="text-sm text-gray-500">{act.start_time}</div>
+                                  {act.damage_type && (
+                                    <div className="text-sm text-gray-700">
+                                      <span className="font-medium">Damage:</span> {act.damage_type}
+                                    </div>
+                                  )}
+                                   <button className="w-full mt-2 py-2 bg-blue-50 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-100 transition">
+                                      Resume
+                                   </button>
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+                     </div>
+                  )}
 
                   {/* RIGHT COLUMN: Resources, Materials, Photos, Actions */}
                   {selectedActivity && (
