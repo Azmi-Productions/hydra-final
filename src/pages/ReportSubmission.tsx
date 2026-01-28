@@ -138,7 +138,7 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
         </button>
       </div>
       <ul className="list-disc list-inside space-y-1">
-        {safeItems.map((item, idx) => (
+        {safeItems.filter(item => item.trim()).map((item, idx) => (
           <li key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
             {item}
             <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
