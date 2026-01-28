@@ -654,20 +654,20 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                               <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
                                   {cat.label}
                               </h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 gap-6">
                                   {photos.map((url, idx) => {
                                      const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                      return (
                                         <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
                                             {isVideo ? (
-                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                <div className="w-full h-64 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
                                                     <video src={url} className="w-full h-full object-cover opacity-80" />
                                                     <div className="absolute inset-0 flex items-center justify-center">
-                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                        <Play className="w-12 h-12 text-white opacity-80" />
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                                <img src={url} alt={cat.label} className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
                                             )}
                                         </a>
                                      );
@@ -704,20 +704,20 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                               <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
                                   {cat.label}
                               </h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 gap-6">
                                   {photos.map((url, idx) => {
                                      const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                      return (
                                         <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
                                             {isVideo ? (
-                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                <div className="w-full h-64 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
                                                     <video src={url} className="w-full h-full object-cover opacity-80" />
                                                     <div className="absolute inset-0 flex items-center justify-center">
-                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                        <Play className="w-12 h-12 text-white opacity-80" />
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                                <img src={url} alt={cat.label} className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
                                             )}
                                         </a>
                                      );
@@ -807,11 +807,11 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
   return (
     <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer 
                     hover:shadow-2xl hover:border-indigo-400 transition duration-300 
-                    transform hover:-translate-y-1 flex justify-between items-center"
+                    transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4"
       onClick={onClick}
     >
       {/* Left: ID, Date, Type */}
-      <div>
+      <div className="w-full">
         <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
           <MapPin className="w-5 h-5 mr-3 text-indigo-500" /> 
           {report.activity_id}
@@ -825,12 +825,12 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
       </div>
 
       {/* Right: Duration and Status */}
-      <div className="text-right flex items-center space-x-4">
-        <p className="text-base font-medium text-gray-600">
-          <span className="block text-xs font-normal text-gray-400">Duration</span>
+      <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
+        <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
+          <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
           {report.duration} hours
         </p>
-        <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md ${statusColor}`}>
+        <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
           {report.status}
         </span>
       </div>
@@ -1128,7 +1128,7 @@ export default function ReportsListPage() {
       <div className=" mx-auto">
         
         {/* Header */}
-        <header className="mb-12  pt-2 pb-4 border-b-2 border-gray-300">
+        <header className="mb-12 pt-2 pb-4 border-b-2 border-gray-300 pl-14 lg:pl-0">
           <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
             Review Center
           </h1>
