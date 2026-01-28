@@ -52,18 +52,86 @@ interface Report {
    photo_link?: string[] | null;
 }
 
-// ====================================================================
-// --- 1. ReportDetailsModal Component (Read-Only for Approved Reports) ---
-// ====================================================================
 interface ModalProps {
   report: Report;
   onClose: () => void;
 }
 
+// Maintenance categories with English/Malay labels
+const MAINTENANCE_CATEGORIES = [
+  { key: 'wakil_syabas', label: 'wakil syabas di tapak / Representative at Site' },
+  { key: 'penyediaan_peralatan', label: 'penyediaan peralatan keselamatan / Safety Equipment Preparation' },
+  { key: 'lokasi_kebocoran', label: 'lokasi kebocoran / Leak Location' },
+  { key: 'pemotongan_jalan', label: 'kerja-kerja pemotongan jalan / Road Cutting Works' },
+  { key: 'pengorekan', label: 'kerja-kerja pengorekan / Excavation Works' },
+  { key: 'pembaikan1', label: 'kerja-kerja pembaikan / Repair Works' },
+  { key: 'barangan_rosak', label: 'barangan rosak/lama / Damaged/Old Items' },
+  { key: 'barangan_ganti', label: 'barangan yang akan diganti / Items to be Replaced' },
+  { key: 'masukkan_pasir', label: 'kerja memasukkan pasir / Sand Filling Works' },
+  { key: 'mampatan_pasir', label: 'kerja-kerja mampatan pasir lapisan pertama / First Layer Sand Compaction Works' },
+  { key: 'mampatan_batu', label: 'kerja-kerja mampatan batu pecah / Aggregate Compaction Works' },
+  { key: 'pembaikan2', label: 'kerja-kerja pembaikan / Repair Works' },
+  { key: 'siap_sepenuhnya', label: 'kerja telah siap sepenuhnya / Work Fully Completed' },
+  { key: 'gambar_papan_putih', label: 'Gambar papan putih / Whiteboard Picture' },
+  { key: 'gambar_pengesahan', label: 'gambar pengesahan tapak / Site Confirmation Picture' },
+  { key: 'gambar_point_bocor_pembaikan', label: 'Gambar point bocor untuk kerja pembaikan / Leak Point Picture for Repair Work' },
+  { key: 'gambar_point_bocor_sudah', label: 'gambar point bocor yang telah pembaikan / Leak Point Picture After Repair' },
+  { key: 'gambar_barang_lama', label: 'gambar barang lama yang telah rosak / Picture of Old Damaged Items' },
+  { key: 'gambar_barang_baru', label: 'gambar barang baru yang telah ditukar / Picture of New Replaced Items' },
+];
+
+// Premix categories with English/Malay labels
+const PREMIX_CATEGORIES = [
+  { key: 'kedalaman_keseluruhan', label: 'gambar kedalaman keseluruhan / Overall Depth Picture' },
+  { key: 'kedalaman_premix_kedua', label: 'gambar kedalaman premix lapisan kedua / Second Layer Premix Depth Picture' },
+  { key: 'tack_coat_pertama', label: 'gambar meletakkan tack coat lapisan pertama / First Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_pertama', label: 'kerja-kerja mampatan premix lapisan pertama / First Layer Premix Compaction Works' },
+  { key: 'tack_coat_kedua', label: 'gambar meletakkan tack coat lapisan kedua / Second Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_kedua', label: 'kerja-kerja mampatan premix lapisan kedua / Second Layer Premix Compaction Works' },
+  { key: 'keluasan_turapan', label: 'gambar keluasan turapan / Pavement Area Picture' },
+  { key: 'kerja_turapan_siap', label: 'gambar kerja turapan siap / Finished Pavement Work Picture' },
+  { key: 'pengesahan_tapak', label: 'gambar pengesahan tapak / Site Confirmation Picture' },
+  { key: 'ukuran_premix', label: 'gambar ukuran premix / Premix Size Picture' },
+  { key: 'label_premix', label: 'gambar label premix / Premix Label Picture' },
+];
+
 const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpdate?: () => void }) => {
   const [editableReport, setEditableReport] = useState<Report>({ ...report });
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
+
   const isRejected = report.status === 'Rejected';
+
+  // Parse photos logic
+  let maintenancePhotosData: Record<string, string[]> = {};
+  let premixPhotosData: Record<string, string[]> = {};
+  let generalPhotos: string[] = [];
+
+  if (report.photo_link && report.photo_link.length > 0) {
+      // Check if first item is JSON string
+      if (report.photo_link[0].trim().startsWith('{') || report.photo_link[0].trim().startsWith('[')) {
+          try {
+              const parsed = JSON.parse(report.photo_link[0]);
+              // It could be our new structure { maintenance: ..., premix: ... }
+              if (parsed.maintenance || parsed.premix) {
+                  if (parsed.maintenance) maintenancePhotosData = parsed.maintenance;
+                  if (parsed.premix) premixPhotosData = parsed.premix;
+              } else {
+                 // Or it could be legacy JSON array? 
+                 // If parsed is array, it might be list of strings?
+                 // But wait, postgres text[] column, supabase returns array of strings.
+                 // If the USER pushed [JSON.stringify(data)], then report.photo_link is ["{...}"]
+                 // Correct to parse report.photo_link[0]
+              }
+          } catch (e) {
+              // Not JSON, assume regular URLs
+              generalPhotos = report.photo_link;
+          }
+      } else {
+          // Plain strings
+          generalPhotos = report.photo_link;
+      }
+  }
 
   // Modern input styling
   // If rejected, allow editing (bg-white), else read-only (bg-gray-50)
@@ -143,301 +211,274 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
         </div>
 
         {/* Body */}
-        <div className="p-8 space-y-8">
+        <div className="p-8 space-y-6">
 
-          {/* Status Badge */}
-          <div className="flex justify-end">
-            <span className={getStatusBadge(report.status)}>
-              {report.status}
-            </span>
+          {/* Status Badge & Tabs */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+             {/* Tabs */}
+             <div className="flex bg-gray-100 p-1 rounded-lg">
+                {(['Report', 'Maintenance', 'Premix'] as const).map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                            activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+             </div>
+             
+             <span className={getStatusBadge(report.status)}>
+               {report.status}
+             </span>
           </div>
 
-          {/* Timing & Location */}
-          <section className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-inner">
-            <h3 className={sectionHeaderStyle}><Calendar className={iconStyle} /> Activity and Timing</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div>
-                <label className={labelStyle}>Date / Day</label>
-                <p className="text-gray-800 font-medium">{report.date} ({report.day})</p>
-              </div>
-              <div>
-                <label className={labelStyle}>Time</label>
-                <p className="text-gray-800 font-medium">{report.start_time} - {report.end_time}</p>
-              </div>
-              <div>
-                <label className={labelStyle}>Duration (hrs)</label>
-                <p className="text-gray-800 font-medium">{report.duration} hrs</p>
-              </div>
-            </div>
+          {/* TAB CONTENT: REPORT */}
+          {activeTab === 'Report' && (
+              <div className="space-y-8 animate-fade-in">
+                  {/* Timing & Location */}
+                  <section className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-inner">
+                    <h3 className={sectionHeaderStyle}><Calendar className={iconStyle} /> Activity and Timing</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                      <div>
+                        <label className={labelStyle}>Date / Day</label>
+                        <p className="text-gray-800 font-medium">{report.date} ({report.day})</p>
+                      </div>
+                      <div>
+                        <label className={labelStyle}>Time</label>
+                        <p className="text-gray-800 font-medium">{report.start_time} - {report.end_time}</p>
+                      </div>
+                      <div>
+                        <label className={labelStyle}>Duration (hrs)</label>
+                        <p className="text-gray-800 font-medium">{report.duration} hrs</p>
+                      </div>
+                    </div>
 
-              <div className="mt-6">
-              <label className={labelStyle}>Damage Type</label>
-              <input
-                type="text"
-                value={editableReport.damage_type ?? ""}
-                onChange={(e) => handleChange("damage_type", e.target.value)}
-                readOnly={!isRejected}
-                className={inputStyle}
-              />
-            </div>
-            <p className="mt-4 text-sm text-gray-600 flex items-center">
-              <MapPin className="w-4 h-4 mr-1 text-red-500" />
-              Start Activity Location : {editableReport.start_latitude ?? "N/A"}, {editableReport.start_longitude ?? "N/A"}
-              {editableReport.start_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.start_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
-            </p>
-            <p className="mt-4 text-sm text-gray-600 flex items-center">
-              <MapPin className="w-4 h-4 mr-1 text-red-500" />
-              Final Report Location : {editableReport.end_latitude ?? "N/A"}, {editableReport.end_longitude ?? "N/A"}
-              {editableReport.end_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.end_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
-            </p>
-          </section>
+                      <div className="mt-6">
+                      <label className={labelStyle}>Damage Type</label>
+                      <input
+                        type="text"
+                        value={editableReport.damage_type ?? ""}
+                        onChange={(e) => handleChange("damage_type", e.target.value)}
+                        readOnly={!isRejected}
+                        className={inputStyle}
+                      />
+                    </div>
+                    <p className="mt-4 text-sm text-gray-600 flex items-center">
+                      <MapPin className="w-4 h-4 mr-1 text-red-500" />
+                      Start Activity Location : {editableReport.start_latitude ?? "N/A"}, {editableReport.start_longitude ?? "N/A"}
+                      {editableReport.start_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.start_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
+                    </p>
+                    <p className="mt-4 text-sm text-gray-600 flex items-center">
+                      <MapPin className="w-4 h-4 mr-1 text-red-500" />
+                      Final Report Location : {editableReport.end_latitude ?? "N/A"}, {editableReport.end_longitude ?? "N/A"}
+                      {editableReport.end_gmap_link && <a className="text-indigo-600 hover:text-indigo-800 underline ml-2" href={editableReport.end_gmap_link} target="_blank" rel="noopener noreferrer">View on Map</a>}
+                    </p>
+                  </section>
 
-          {/* Resources & Manpower */}
-          <section className="space-y-4 pt-4">
-            <h3 className={sectionHeaderStyle}><Layers className={iconStyle} /> Resources & Manpower</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className={labelStyle}>Equipment Used</label>
-                <input type="text" value={editableReport.equipment_used ?? ""} onChange={(e) => handleChange("equipment_used", e.target.value)} readOnly={!isRejected} className={inputStyle} />
-              </div>
-              <div>
-                <label className={labelStyle}>Manpower Involved</label>
-                <input type="text" value={editableReport.manpower_involved ?? ""} onChange={(e) => handleChange("manpower_involved", e.target.value)} readOnly={!isRejected} className={inputStyle} />
-              </div>
-            </div>
-          </section>
+                  {/* Resources & Manpower */}
+                  <section className="space-y-4 pt-4">
+                    <h3 className={sectionHeaderStyle}><Layers className={iconStyle} /> Resources & Manpower</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className={labelStyle}>Equipment Used</label>
+                        <input type="text" value={editableReport.equipment_used ?? ""} onChange={(e) => handleChange("equipment_used", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                      </div>
+                      <div>
+                        <label className={labelStyle}>Manpower Involved</label>
+                        <input type="text" value={editableReport.manpower_involved ?? ""} onChange={(e) => handleChange("manpower_involved", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                      </div>
+                    </div>
+                  </section>
 
-          {/* Materials */}
-          <section className="space-y-4 pt-4">
-            <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="col-span-2 sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <DimensionInput
-                      label="Excavation (m³)"
-                      value={editableReport.excavation || null}
-                      onChange={(val) => handleChange("excavation", val)}
+                  {/* Materials */}
+                  <section className="space-y-4 pt-4">
+                    <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="col-span-2 sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <DimensionInput
+                              label="Excavation (m³)"
+                              value={editableReport.excavation || null}
+                              onChange={(val) => handleChange("excavation", val)}
+                              readOnly={!isRejected}
+                          />
+                          <DimensionInput
+                              label="Sand (m³)"
+                              value={editableReport.sand || null}
+                              onChange={(val) => handleChange("sand", val)}
+                              readOnly={!isRejected}
+                          />
+                          <DimensionInput
+                              label="Aggregate (m³)"
+                              value={editableReport.aggregate || null}
+                              onChange={(val) => handleChange("aggregate", val)}
+                              readOnly={!isRejected}
+                          />
+                          <DimensionInput
+                              label="Premix (kg)"
+                              value={editableReport.premix || null}
+                              onChange={(val) => handleChange("premix", val)}
+                              readOnly={!isRejected}
+                              showDepth={false}
+                          />
+                          <DimensionInput
+                              label="Cement (kg)"
+                              value={editableReport.cement || null}
+                              onChange={(val) => handleChange("cement", val)}
+                              readOnly={!isRejected}
+                              showDepth={false}
+                          />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={labelStyle}>Pipe Usage (m)</label>
+                        <input type="text" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={labelStyle}>Fittings</label>
+                        <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* General / Legacy Photos */}
+                  {generalPhotos.length > 0 && (
+                      <section className="space-y-4 pt-4">
+                        <h3 className={sectionHeaderStyle}>
+                          <FolderOpen className={iconStyle} /> General Media Attachments
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {generalPhotos.map((url, idx) => {
+                            const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                            return (
+                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group">
+                                {isVideo ? (
+                                  <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                                    <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Play className="w-5 h-5 text-white" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <img src={url} alt={`Attachment ${idx + 1}`} className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition" loading="lazy" />
+                                )}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </section>
+                  )}
+                  
+                  {/* Remarks */}
+                  <section className="space-y-4 pt-4">
+                    <h3 className={sectionHeaderStyle}><Clock className={iconStyle} /> Final Remarks</h3>
+                     <textarea
+                      value={editableReport.remarks ?? ""}
+                      onChange={(e) => handleChange("remarks", e.target.value)}
                       readOnly={!isRejected}
-                  />
-                  <DimensionInput
-                      label="Sand (m³)"
-                      value={editableReport.sand || null}
-                      onChange={(val) => handleChange("sand", val)}
-                      readOnly={!isRejected}
-                  />
-                  <DimensionInput
-                      label="Aggregate (m³)"
-                      value={editableReport.aggregate || null}
-                      onChange={(val) => handleChange("aggregate", val)}
-                      readOnly={!isRejected}
-                  />
-                  <DimensionInput
-                      label="Premix (kg)"
-                      value={editableReport.premix || null}
-                      onChange={(val) => handleChange("premix", val)}
-                      readOnly={!isRejected}
-                      showDepth={false}
-                  />
-                  <DimensionInput
-                      label="Cement (kg)"
-                      value={editableReport.cement || null}
-                      onChange={(val) => handleChange("cement", val)}
-                      readOnly={!isRejected}
-                      showDepth={false}
-                  />
+                      rows={4}
+                      className={`${inputStyle} resize-y bg-yellow-50 border-yellow-200`}
+                    />
+                  </section>
+                  
+                   <p className="text-xl text-gray-500 mt-1">
+                    Submitted by: <span className="font-medium">{report.submitted_by}</span>
+                  </p>
+                  
               </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Pipe Usage (m)</label>
-                <input type="text" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+          )}
+
+          {/* TAB CONTENT: MAINTENANCE */}
+          {activeTab === 'Maintenance' && (
+              <div className="space-y-6 animate-fade-in">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Maintenance Photos</h3>
+                   {/* If legacy format, maintenance data might be empty. Check structure generally. */}
+                   {/* Iterate Categories */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {MAINTENANCE_CATEGORIES.map(cat => {
+                        const photos = maintenancePhotosData[cat.key] || [];
+                        if (photos.length === 0) return null;
+                        
+                        return (
+                            <div key={cat.key} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                <h4 className="text-sm font-bold text-blue-700 mb-3 border-b pb-1">{cat.label}</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {photos.map((url, idx) => {
+                                        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                                        return (
+                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-24">
+                                            {isVideo ? (
+                                              <div className="relative w-full h-full bg-black rounded-lg border border-gray-200 overflow-hidden">
+                                                <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <Play className="w-4 h-4 text-white" />
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <img src={url} alt={cat.label} className="w-full h-full object-cover rounded-lg border border-gray-200 hover:shadow-lg transition" loading="lazy" />
+                                            )}
+                                           </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                      })}
+                   </div>
+                   
+                   {!Object.keys(maintenancePhotosData).length && generalPhotos.length === 0 && (
+                       <p className="text-center text-gray-400 italic py-10">No maintenance photos categorized found.</p>
+                   )}
               </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Fittings</label>
-                <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+          )}
+
+           {/* TAB CONTENT: PREMIX */}
+           {activeTab === 'Premix' && (
+              <div className="space-y-6 animate-fade-in">
+                   <h3 className="text-lg font-semibold text-gray-700 mb-4">Premix Photos</h3>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {PREMIX_CATEGORIES.map(cat => {
+                        const photos = premixPhotosData[cat.key] || [];
+                        if (photos.length === 0) return null;
+                        
+                        return (
+                            <div key={cat.key} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                <h4 className="text-sm font-bold text-blue-700 mb-3 border-b pb-1">{cat.label}</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {photos.map((url, idx) => {
+                                        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                                        return (
+                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-24">
+                                            {isVideo ? (
+                                              <div className="relative w-full h-full bg-black rounded-lg border border-gray-200 overflow-hidden">
+                                                <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <Play className="w-4 h-4 text-white" />
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <img src={url} alt={cat.label} className="w-full h-full object-cover rounded-lg border border-gray-200 hover:shadow-lg transition" loading="lazy" />
+                                            )}
+                                           </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                      })}
+                   </div>
+                   
+                   {!Object.keys(premixPhotosData).length && (
+                       <p className="text-center text-gray-400 italic py-10">No premix photos categorized found.</p>
+                   )}
               </div>
-            </div>
-          </section>
-
-          <p className="text-xl text-gray-500 mt-1">
-            Submitted by: <span className="font-medium">{report.submitted_by}</span>
-          </p>
-
-         {/* Original Media Attachments */}
-         {report.photo_link && report.photo_link.length > 0 && (
-  <section className="space-y-4 pt-4">
-    <h3 className={sectionHeaderStyle}>
-      <FolderOpen className={iconStyle} /> General Media Attachments
-    </h3>
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-      {report.photo_link.map((url, idx) => {
-        // Detect video by file extension in URL
-        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
-
-        return (
-          <a
-            key={idx}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block group"
-          >
-            {isVideo ? (
-              // Video preview with play indicator
-              <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                <video
-                  src={url}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="w-5 h-5 text-white" />
-                </div>
-              </div>
-            ) : (
-              // Image preview
-              <img
-                src={url}
-                alt={`Attachment ${idx + 1}`}
-                className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                loading="lazy"
-              />
-            )}
-          </a>
-        );
-      })}
-    </div>
-  </section>
-)}
-
-         {/* Maintenance Photos */}
-         {(() => {
-           let maintenancePhotos: string[] = [];
-           if (report.photo_link && report.photo_link.length > 0) {
-             try {
-               const parsed = JSON.parse(report.photo_link[0]);
-               if (parsed.maintenance) {
-                 maintenancePhotos = Object.values(parsed.maintenance).flat() as string[];
-               }
-             } catch (e) {}
-           }
-           return maintenancePhotos.length > 0 && (
-             <section className="space-y-4 pt-4">
-               <h3 className={sectionHeaderStyle}>
-                 <FolderOpen className={iconStyle} /> Maintenance Photos
-               </h3>
-               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                 {maintenancePhotos.map((url, idx) => {
-                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
-
-                   return (
-                     <a
-                       key={idx}
-                       href={url}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="block group"
-                     >
-                       {isVideo ? (
-                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                           <video
-                             src={url}
-                             className="w-full h-full object-cover"
-                             muted
-                             playsInline
-                             preload="metadata"
-                           />
-                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Play className="w-5 h-5 text-white" />
-                           </div>
-                         </div>
-                       ) : (
-                         <img
-                           src={url}
-                           alt={`Maintenance Photo ${idx + 1}`}
-                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                           loading="lazy"
-                         />
-                       )}
-                     </a>
-                   );
-                 })}
-               </div>
-             </section>
-           );
-         })()}
-
-         {/* Premix Photos */}
-         {(() => {
-           let premixPhotos: string[] = [];
-           if (report.photo_link && report.photo_link.length > 0) {
-             try {
-               const parsed = JSON.parse(report.photo_link[0]);
-               if (parsed.premix) {
-                 premixPhotos = Object.values(parsed.premix).flat() as string[];
-               }
-             } catch (e) {}
-           }
-           return premixPhotos.length > 0 && (
-             <section className="space-y-4 pt-4">
-               <h3 className={sectionHeaderStyle}>
-                 <FolderOpen className={iconStyle} /> Premix Photos
-               </h3>
-               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                 {premixPhotos.map((url, idx) => {
-                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
-
-                   return (
-                     <a
-                       key={idx}
-                       href={url}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="block group"
-                     >
-                       {isVideo ? (
-                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                           <video
-                             src={url}
-                             className="w-full h-full object-cover"
-                             muted
-                             playsInline
-                             preload="metadata"
-                           />
-                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Play className="w-5 h-5 text-white" />
-                           </div>
-                         </div>
-                       ) : (
-                         <img
-                           src={url}
-                           alt={`Premix Photo ${idx + 1}`}
-                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                           loading="lazy"
-                         />
-                       )}
-                     </a>
-                   );
-                 })}
-               </div>
-             </section>
-           );
-         })()}
-
-          {/* Remarks */}
-          <section className="space-y-4 pt-4">
-            <h3 className={sectionHeaderStyle}><Clock className={iconStyle} /> Final Remarks</h3>
-             <textarea
-              value={editableReport.remarks ?? ""}
-              onChange={(e) => handleChange("remarks", e.target.value)}
-              readOnly={!isRejected}
-              rows={4}
-              className={`${inputStyle} resize-y bg-yellow-50 border-yellow-200`}
-            />
-          </section>
+           )}
 
           {/* Action Buttons */}
           {isRejected && (
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-4 border-t border-gray-100">
                   <button
                       onClick={handleResubmit}
                       disabled={saving}

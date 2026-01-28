@@ -11,7 +11,7 @@ import { Toaster } from "react-hot-toast";
 import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
 import LocationHistoryPage from "./pages/LocationHistory.tsx";
-import MaintenanceReport from "./pages/MaintenanceReport.tsx";
+
 
 function AppWrapper() {
   const location = useLocation();
@@ -107,15 +107,8 @@ function AppWrapper() {
             }
           />
 
-          {/* Maintenance Report Printable View */}
-          <Route
-            path="/maintenance-report/:id?"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor"]}>
-                <MaintenanceReport />
-              </ProtectedRoute>
-            }
-          />
+         
+          
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -52,6 +52,44 @@ interface Report {
    photo_link?: string[] | null;
 }
 
+// Maintenance categories with English/Malay labels
+const MAINTENANCE_CATEGORIES = [
+  { key: 'wakil_syabas', label: 'wakil syabas di tapak / Representative at Site' },
+  { key: 'penyediaan_peralatan', label: 'penyediaan peralatan keselamatan / Safety Equipment Preparation' },
+  { key: 'lokasi_kebocoran', label: 'lokasi kebocoran / Leak Location' },
+  { key: 'pemotongan_jalan', label: 'kerja-kerja pemotongan jalan / Road Cutting Works' },
+  { key: 'pengorekan', label: 'kerja-kerja pengorekan / Excavation Works' },
+  { key: 'pembaikan1', label: 'kerja-kerja pembaikan / Repair Works' },
+  { key: 'barangan_rosak', label: 'barangan rosak/lama / Damaged/Old Items' },
+  { key: 'barangan_ganti', label: 'barangan yang akan diganti / Items to be Replaced' },
+  { key: 'masukkan_pasir', label: 'kerja memasukkan pasir / Sand Filling Works' },
+  { key: 'mampatan_pasir', label: 'kerja-kerja mampatan pasir lapisan pertama / First Layer Sand Compaction Works' },
+  { key: 'mampatan_batu', label: 'kerja-kerja mampatan batu pecah / Aggregate Compaction Works' },
+  { key: 'pembaikan2', label: 'kerja-kerja pembaikan / Repair Works' },
+  { key: 'siap_sepenuhnya', label: 'kerja telah siap sepenuhnya / Work Fully Completed' },
+  { key: 'gambar_papan_putih', label: 'Gambar papan putih / Whiteboard Picture' },
+  { key: 'gambar_pengesahan', label: 'gambar pengesahan tapak / Site Confirmation Picture' },
+  { key: 'gambar_point_bocor_pembaikan', label: 'Gambar point bocor untuk kerja pembaikan / Leak Point Picture for Repair Work' },
+  { key: 'gambar_point_bocor_sudah', label: 'gambar point bocor yang telah pembaikan / Leak Point Picture After Repair' },
+  { key: 'gambar_barang_lama', label: 'gambar barang lama yang telah rosak / Picture of Old Damaged Items' },
+  { key: 'gambar_barang_baru', label: 'gambar barang baru yang telah ditukar / Picture of New Replaced Items' },
+];
+
+// Premix categories with English/Malay labels
+const PREMIX_CATEGORIES = [
+  { key: 'kedalaman_keseluruhan', label: 'gambar kedalaman keseluruhan / Overall Depth Picture' },
+  { key: 'kedalaman_premix_kedua', label: 'gambar kedalaman premix lapisan kedua / Second Layer Premix Depth Picture' },
+  { key: 'tack_coat_pertama', label: 'gambar meletakkan tack coat lapisan pertama / First Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_pertama', label: 'kerja-kerja mampatan premix lapisan pertama / First Layer Premix Compaction Works' },
+  { key: 'tack_coat_kedua', label: 'gambar meletakkan tack coat lapisan kedua / Second Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_kedua', label: 'kerja-kerja mampatan premix lapisan kedua / Second Layer Premix Compaction Works' },
+  { key: 'keluasan_turapan', label: 'gambar keluasan turapan / Pavement Area Picture' },
+  { key: 'kerja_turapan_siap', label: 'gambar kerja turapan siap / Finished Pavement Work Picture' },
+  { key: 'pengesahan_tapak', label: 'gambar pengesahan tapak / Site Confirmation Picture' },
+  { key: 'ukuran_premix', label: 'gambar ukuran premix / Premix Size Picture' },
+  { key: 'label_premix', label: 'gambar label premix / Premix Label Picture' },
+];
+
 // ====================================================================
 // --- 1. ReportDetailsModal Component ---
 // ====================================================================
@@ -67,6 +105,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   const [loading, setLoading] = useState(false);
   const [supervisors, setSupervisors] = useState<{ id: number; username: string }[]>([]);
   const [showAddSupervisor, setShowAddSupervisor] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
 
   // Use the currently active report for display/editing
   const activeReport = reports[activeReportIdx] || report;
@@ -293,6 +332,36 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     setSaving(false);
   };
 
+  // Parse photos logic
+  let maintenancePhotosData: Record<string, string[]> = {};
+  let premixPhotosData: Record<string, string[]> = {};
+
+  const currentReportDisplay = reports[activeReportIdx] || report;
+
+  if (currentReportDisplay.photo_link && currentReportDisplay.photo_link.length > 0) {
+      // Check if first item is JSON string
+      if (currentReportDisplay.photo_link[0].trim().startsWith('{') || currentReportDisplay.photo_link[0].trim().startsWith('[')) {
+          try {
+              const parsed = JSON.parse(currentReportDisplay.photo_link[0]);
+              // It could be our new structure { maintenance: ..., premix: ... }
+              if (parsed.maintenance || parsed.premix) {
+                  if (parsed.maintenance) maintenancePhotosData = parsed.maintenance;
+                  if (parsed.premix) premixPhotosData = parsed.premix;
+              } else {
+                 // Or it could be legacy JSON array? 
+                 // If parsed is array, it might be list of strings?
+                 // But wait, postgres text[] column, supabase returns array of strings.
+                 // If the USER pushed [JSON.stringify(data)], then report.photo_link is [\"{...}\"]
+                 // Correct to parse report.photo_link[0]
+              }
+          } catch (e) {
+              // Not JSON, assume regular URLs
+          }
+      } else {
+          // Plain strings
+      }
+  }
+
   // Modern input styling
   const inputStyle = "w-full border border-gray-300 p-2 rounded-lg text-sm transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
   const labelStyle = "text-xs font-semibold text-gray-600 mb-1 block";
@@ -391,9 +460,24 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         ) : (
         <div className="p-8 space-y-8">
           
-          {/* Status Badge */}
-          <div className="flex justify-end">
-            <span className={`inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full ${
+          {/* Status Badge & Tabs */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+             {/* Tabs */}
+             <div className="flex bg-gray-100 p-1 rounded-lg">
+                {(['Report', 'Maintenance', 'Premix'] as const).map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                            activeTab === tab ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+             </div>
+             
+             <span className={`inline-flex items-center px-4 py-1.5 text-sm font-semibold rounded-full ${
               editableReport.status === 'Approved' ? 'bg-green-100 text-green-700' :
               editableReport.status === 'Rejected' ? 'bg-red-100 text-red-700' :
               'bg-yellow-100 text-yellow-700'
@@ -401,6 +485,10 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
               {editableReport.status}
             </span>
           </div>
+
+        {/* TAB CONTENT: REPORT */}
+        {activeTab === 'Report' && (
+          <div className="space-y-8 animate-fade-in">
 
           {/* Timing & Location */}
           <section className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-inner">
@@ -504,7 +592,6 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       {editableReport.photo_link.map((url, idx) => {
         const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
-
         return (
           <a
             key={idx}
@@ -514,147 +601,139 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             className="block group"
           >
             {isVideo ? (
-              <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                <video
-                  src={url}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-                {/* Optional: Play overlay on hover */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="w-6 h-6 text-white" />
+                          <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                            <video
+                              src={url}
+                              className="w-full h-full object-cover"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                            {/* Optional: Play overlay on hover */}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play className="w-6 h-6 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={url}
+                            alt={`Attachment ${idx + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
+                            loading="lazy"
+                          />
+                        )}
+                      </a>
+                    );
+                  })}
                 </div>
-              </div>
-            ) : (
-              <img
-                src={url}
-                alt={`Attachment ${idx + 1}`}
-                className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                loading="lazy"
-              />
+              </section>
             )}
-          </a>
-        );
-      })}
-    </div>
-  </section>
-)}
+           </div>
+        )}
 
-         {/* Maintenance Photos */}
-         {(() => {
-           let maintenancePhotos: string[] = [];
-           if (editableReport.photo_link && editableReport.photo_link.length > 0) {
-             try {
-               const parsed = JSON.parse(editableReport.photo_link[0]);
-               if (parsed.maintenance) {
-                 maintenancePhotos = Object.values(parsed.maintenance).flat() as string[];
-               }
-             } catch (e) {}
-           }
-           return maintenancePhotos.length > 0 && (
-             <section className="space-y-4 pt-4">
-               <h3 className={sectionHeaderStyle}>
-                 <FolderOpen className={iconStyle} /> Maintenance Photos
-               </h3>
-               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                 {maintenancePhotos.map((url, idx) => {
-                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+        {/* TAB CONTENT: MAINTENANCE */}
+        {activeTab === 'Maintenance' && (
+           <div className="space-y-6 animate-fade-in">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center border-b pb-2">
+                 <FolderOpen className="w-5 h-5 mr-2 text-indigo-500" /> Maintenance Photos
+              </h3>
+              
+              {Object.keys(maintenancePhotosData).length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <p className="text-gray-500 italic">No categorized maintenance photos found.</p>
+                  </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Iterate categories to keep order */}
+                  {MAINTENANCE_CATEGORIES.map(cat => {
+                      const photos = maintenancePhotosData[cat.key];
+                      if (!photos || photos.length === 0) return null;
 
-                   return (
-                     <a
-                       key={idx}
-                       href={url}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="block group"
-                     >
-                       {isVideo ? (
-                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                           <video
-                             src={url}
-                             className="w-full h-full object-cover"
-                             muted
-                             playsInline
-                             preload="metadata"
-                           />
-                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Play className="w-6 h-6 text-white" />
-                           </div>
-                         </div>
-                       ) : (
-                         <img
-                           src={url}
-                           alt={`Maintenance Photo ${idx + 1}`}
-                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                           loading="lazy"
-                         />
-                       )}
-                     </a>
-                   );
-                 })}
-               </div>
-             </section>
-           );
-         })()}
+                      return (
+                          <div key={cat.key} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                              <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
+                                  {cat.label}
+                              </h4>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                  {photos.map((url, idx) => {
+                                     const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                                     return (
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
+                                            {isVideo ? (
+                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                    <video src={url} className="w-full h-full object-cover opacity-80" />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                            )}
+                                        </a>
+                                     );
+                                  })}
+                              </div>
+                          </div>
+                      );
+                  })}
+                </div>
+              )}
+           </div>
+        )}
 
-         {/* Premix Photos */}
-         {(() => {
-           let premixPhotos: string[] = [];
-           if (editableReport.photo_link && editableReport.photo_link.length > 0) {
-             try {
-               const parsed = JSON.parse(editableReport.photo_link[0]);
-               if (parsed.premix) {
-                 premixPhotos = Object.values(parsed.premix).flat() as string[];
-               }
-             } catch (e) {}
-           }
-           return premixPhotos.length > 0 && (
-             <section className="space-y-4 pt-4">
-               <h3 className={sectionHeaderStyle}>
-                 <FolderOpen className={iconStyle} /> Premix Photos
-               </h3>
-               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                 {premixPhotos.map((url, idx) => {
-                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+        {/* TAB CONTENT: PREMIX */}
+        {activeTab === 'Premix' && (
+           <div className="space-y-6 animate-fade-in">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center border-b pb-2">
+                 <FolderOpen className="w-5 h-5 mr-2 text-indigo-500" /> Premix Photos
+              </h3>
+              
+              {Object.keys(premixPhotosData).length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <p className="text-gray-500 italic">No categorized premix photos found.</p>
+                  </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Iterate categories to keep order */}
+                  {PREMIX_CATEGORIES.map(cat => {
+                      const photos = premixPhotosData[cat.key];
+                      if (!photos || photos.length === 0) return null;
 
-                   return (
-                     <a
-                       key={idx}
-                       href={url}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="block group"
-                     >
-                       {isVideo ? (
-                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                           <video
-                             src={url}
-                             className="w-full h-full object-cover"
-                             muted
-                             playsInline
-                             preload="metadata"
-                           />
-                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Play className="w-6 h-6 text-white" />
-                           </div>
-                         </div>
-                       ) : (
-                         <img
-                           src={url}
-                           alt={`Premix Photo ${idx + 1}`}
-                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                           loading="lazy"
-                         />
-                       )}
-                     </a>
-                   );
-                 })}
-               </div>
-             </section>
-           );
-         })()}
+                      return (
+                          <div key={cat.key} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                              <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
+                                  {cat.label}
+                              </h4>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                  {photos.map((url, idx) => {
+                                     const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                                     return (
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
+                                            {isVideo ? (
+                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                    <video src={url} className="w-full h-full object-cover opacity-80" />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                            )}
+                                        </a>
+                                     );
+                                  })}
+                              </div>
+                          </div>
+                      );
+                  })}
+                </div>
+              )}
+           </div>
+        )}
+
+
+
+
 
           {/* Remarks */}
           <section className="space-y-4 pt-4">

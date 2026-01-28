@@ -67,7 +67,6 @@ const Sidebar: React.FC<SidebarProps> = ({ children }) => {
     { to: '/device-manager', label: 'Device Manager', allowedRoles: ['superadmin', 'admin'], icon: Cpu },
     { to: '/live-map', label: 'Live Map', allowedRoles: ['superadmin', 'admin'], icon: Map },
     { to: '/report-submission', label: 'Report Submission', allowedRoles: ['superadmin', 'admin', 'supervisor'], icon: Send },
-    { to: '/maintenance-report', label: 'Maintenance Report', allowedRoles: ['superadmin', 'admin', 'supervisor'], icon: FileText },
   ];
 
   return (
