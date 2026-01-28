@@ -1,7 +1,8 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -150,6 +151,8 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
   );
 };
 
+// DimensionInput component has been moved to ../components/DimensionInput.tsx
+
 // --- Main Page ---
 export default function ReportSubmissionPage() {
   const [activityId, setActivityId] = useState("");
@@ -161,10 +164,10 @@ export default function ReportSubmissionPage() {
   const [damageType, setDamageType] = useState("");
   const [equipmentList, setEquipmentList] = useState<string[]>([]);
   const [manpowerList, setManpowerList] = useState<string[]>([]);
-  const [excavation, setExcavation] = useState("");
-  const [sand, setSand] = useState("");
-  const [aggregate, setAggregate] = useState("");
-  const [premix, setPremix] = useState("");
+  const [excavation, setExcavation] = useState<Dimensions | null>(null);
+  const [sand, setSand] = useState<Dimensions | null>(null);
+  const [aggregate, setAggregate] = useState<Dimensions | null>(null);
+  const [premix, setPremix] = useState<Dimensions | null>(null);
   const [pipeUsage, setPipeUsage] = useState("");
   const [fittings, setFittings] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -195,7 +198,45 @@ export default function ReportSubmissionPage() {
       setDay(weekday);
     }
   }, [date]);
+const MAX_VIDEO_SIZE_MB = 15;
+const MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION = 20; // optional safety net
+const MAX_TOTAL_FILES = 5;
 
+const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    // Validate video size
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    }
+    // Optional: Block extremely large images (before compression)
+    else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Enforce total file count limit (uploaded + pending)
+  const totalFilesAfterAdd = uploadedPhotoUrls.length + photoFiles.length + newValidFiles.length;
+  if (totalFilesAfterAdd > MAX_TOTAL_FILES) {
+    toast.error(`You can only attach up to ${MAX_TOTAL_FILES} files in total.`);
+    return;
+  }
+
+  // Add valid files
+  setPhotoFiles(prev => [...prev, ...newValidFiles]);
+};
   const fetchStartedActivities = async () => {
     const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=eq.Started&submitted_by=eq.${username}`, {
       headers: {
@@ -371,10 +412,46 @@ export default function ReportSubmissionPage() {
     }
     setManpowerList(Array.isArray(manList) ? manList : []);
 
-    setExcavation(activity.excavation || "");
-    setSand(activity.sand || "");
-    setAggregate(activity.aggregate || "");
-    setPremix(activity.premix || "");
+    // Helper to parse potential string or object dimensions
+    const parseDimensions = (val: any): Dimensions | null => {
+        if (!val) return null;
+        if (typeof val === 'object') {
+            return {
+                length: val.length || "",
+                width: val.width || "",
+                depth: val.depth || ""
+            };
+        }
+        if (typeof val === 'string') {
+             // Try to parse JSON first
+             try {
+                const parsed = JSON.parse(val);
+                if(typeof parsed === 'object') {
+                     return {
+                        length: parsed.length || "",
+                        width: parsed.width || "",
+                        depth: parsed.depth || ""
+                     };
+                }
+             } catch(e) {
+                 // Ignore
+             }
+
+            // Fallback to "LxWxD" string parsing
+            const parts = val.toLowerCase().split('x');
+            return {
+                length: parts[0] || "",
+                width: parts[1] || "",
+                depth: parts[2] || ""
+            };
+        }
+        return null;
+    };
+
+    setExcavation(parseDimensions(activity.excavation));
+    setSand(parseDimensions(activity.sand));
+    setAggregate(parseDimensions(activity.aggregate));
+    setPremix(parseDimensions(activity.premix));
     setPipeUsage(activity.pipe_usage || "");
     setFittings(activity.fittings || "");
     setRemarks(activity.remarks || "");
@@ -542,7 +619,7 @@ const handleSubmit = async () => {
   }
 
   // --- Validation: Enforce all fields ---
-  if (!damageType || !remarks || !date || !startTime) {
+  if (!damageType  || !date || !startTime) {
       toast.error("Please fill in all required fields (Damage Type, Remarks).");
       return;
   }
@@ -554,37 +631,38 @@ const handleSubmit = async () => {
     let photoLinks: string[] = [...uploadedPhotoUrls]; // existing uploaded URLs
 
     if (photoFiles.length > 0) {
-      const uploadPromises = photoFiles.map(async (file) => {
-        try {
-          // Compression
-          const options = {
-            maxSizeMB: 1,
-            maxWidthOrHeight: 1920,
-            useWebWorker: true,
-          };
-          const compressedFile = await imageCompression(file, options);
-          
-          const formData = new FormData();
-          formData.append("file", compressedFile);
+     const uploadPromises = photoFiles.map(async (file) => {
+  try {
+    let finalFile = file;
 
-          const uploadRes = await fetch(
-            "https://azmiproductions.com/api/hydra/upload.php",
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
+    // Only compress images
+    if (file.type.startsWith('image/')) {
+      const options = {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
+      finalFile = await imageCompression(file, options);
+    }
 
-          if (!uploadRes.ok) throw new Error("Upload failed");
-          
-          const data = await uploadRes.json();
-          return data.url;
-        } catch (error) {
-          console.error("Error uploading file:", error);
-          toast.error(`Failed to upload one of the images.`);
-          return null;
-        }
-      });
+    const formData = new FormData();
+    formData.append("file", finalFile);
+
+    const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadRes.ok) throw new Error("Upload failed");
+
+    const data = await uploadRes.json();
+    return data.url;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    toast.error(`Failed to upload: ${file.name}`);
+    return null;
+  }
+});
 
       const results = await Promise.all(uploadPromises);
       const successfulUploads = results.filter((url): url is string => url !== null);
@@ -837,7 +915,7 @@ const handleSubmit = async () => {
                   <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                 </div>
                 <hr className="border-gray-100 pt-3" />
-                <FormInput label="Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+                <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
               </div>
             )}
           </div>
@@ -850,7 +928,7 @@ const handleSubmit = async () => {
                 </h2>
 
                 <ListInput 
-                  label="Equipment Used" 
+                  label="Peralatan Digunakan / Equipment Used" 
                   items={equipmentList} 
                   setItems={setEquipmentList} 
                   placeholder="Add equipment" 
@@ -858,20 +936,56 @@ const handleSubmit = async () => {
                   setInputValue={setEquipmentInput}
                 />
                 <ListInput 
-                  label="Manpower Involved" 
+                  label="Tenaga Kerja / Manpower Involved" 
                   items={manpowerList} 
                   setItems={setManpowerList} 
                   placeholder="Add manpower" 
                   inputValue={manpowerInput}
                   setInputValue={setManpowerInput}
                 />
-                <FormInput label="Excavation (m³)" type="number" placeholder="Excavation quantity" value={excavation ?? ""} onChange={(e) => setExcavation(e.target.value)} />
-                <FormInput label="Sand (m³)" type="number" placeholder="Sand quantity" value={sand ?? ""} onChange={(e) => setSand(e.target.value)} />
-                <FormInput label="Aggregate (m³)" type="number" placeholder="Aggregate quantity" value={aggregate ?? ""} onChange={(e) => setAggregate(e.target.value)} />
-                <FormInput label="Premix (m³)" type="number" placeholder="Premix quantity" value={premix ?? ""} onChange={(e) => setPremix(e.target.value)} />
-                <FormInput label="Pipe Usage (m)" type="number" placeholder="Pipe usage" value={pipeUsage ?? ""} onChange={(e) => setPipeUsage(e.target.value)} />
-                <FormInput label="Fittings" placeholder="Fittings" value={fittings ?? ""} onChange={(e) => setFittings(e.target.value)} />
-                <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                {/* Materials */}
+            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4 mt-8 flex items-center">
+               <Briefcase className="w-5 h-5 mr-2 text-blue-600" />
+               Materials Quantities
+            </h3>
+
+            <div className="space-y-4">
+               <DimensionInput
+                  label="Excavation (m³)"
+                  value={excavation}
+                  onChange={setExcavation}
+               />
+               <DimensionInput
+                  label="Sand (m³)"
+                  value={sand}
+                  onChange={setSand}
+               />
+               <DimensionInput
+                  label="Aggregate (m³)"
+                  value={aggregate}
+                  onChange={setAggregate}
+               />
+                <DimensionInput
+                  label="Premix (kg)"
+                  value={premix}
+                  onChange={setPremix}
+                  showDepth={false}
+               />
+               <FormInput
+                label="Pipe Usage (m)"
+                placeholder="e.g. 5"
+                type="number"
+                value={pipeUsage}
+                onChange={(e) => setPipeUsage(e.target.value)}
+              />
+              <FormInput
+                label="Fittings"
+                placeholder="e.g. Coupling, Elbow"
+                value={fittings}
+                onChange={(e) => setFittings(e.target.value)}
+              />
+            </div>
+            <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
                 {/* Photo Upload */}
                 <div className="mt-4">
@@ -895,19 +1009,15 @@ const handleSubmit = async () => {
   </label>
 
   {/* Hidden native input */}
-  <input
-    id="file-upload"
-    type="file"
-    accept="image/*"
-    multiple
-    capture="environment"
-    onChange={(e) => {
-      const files = e.target.files;
-      if (!files) return;
-      setPhotoFiles((prevFiles) => [...prevFiles, ...Array.from(files)]);
-    }}
-    className="sr-only" 
-  />
+ <input
+  id="file-upload"
+  type="file"
+  accept="image/*,video/*"
+  multiple
+  capture="environment"
+  onChange={handleFileSelect} // ← use the new handler
+  className="sr-only"
+/>
 
   {/* --- 2. Photo Previews & Management --- */}
   {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
@@ -937,38 +1047,58 @@ const handleSubmit = async () => {
         ))}
 
         {/* Newly Selected Files (Pending Upload) */}
-        {photoFiles.map((file, idx) => (
-          <div 
-            key={`file-${idx}`} 
-            className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
-            title={file.name}
-          >
-            <img 
-              src={URL.createObjectURL(file)} 
-              alt={`upload-${idx}`} 
-              className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105" 
-            />
-            
-            {/* Status Badge */}
-            <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
-                Pending...
-            </div>
-            
-            {/* Removal Button - Improved design */}
-            <button
-              type="button"
-              onClick={() => {
-                const newFiles = [...photoFiles];
-                newFiles.splice(idx, 1);
-                setPhotoFiles(newFiles);
-              }}
-              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              title="Remove file"
-            >
-              <Trash2 className="w-4 h-4" /> {/* Using Trash icon for removal */}
-            </button>
+        {/* Newly Selected Files (Pending Upload) */}
+{photoFiles.map((file, idx) => {
+  const isVideo = file.type.startsWith('video/');
+  const fileUrl = URL.createObjectURL(file);
+
+  return (
+    <div
+      key={`file-${idx}`}
+      className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
+      title={file.name}
+    >
+      {isVideo ? (
+        <div className="w-full h-24 bg-gray-800 flex items-center justify-center relative">
+          <video
+            src={fileUrl}
+            className="w-full h-full object-cover opacity-90"
+            muted
+            playsInline
+            poster="" // optional: add a poster later if needed
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <Play className="w-6 h-6 text-white" /> {/* You'll need to import Play */}
           </div>
-        ))}
+        </div>
+      ) : (
+        <img
+          src={fileUrl}
+          alt={`upload-${idx}`}
+          className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105"
+        />
+      )}
+
+      <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
+        {isVideo ? 'Video' : 'Image'}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          const newFiles = [...photoFiles];
+          newFiles.splice(idx, 1);
+          setPhotoFiles(newFiles);
+          URL.revokeObjectURL(fileUrl); // Clean up memory
+        }}
+        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700"
+        title="Remove file"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+})}
       </div>
     </div>
   )}

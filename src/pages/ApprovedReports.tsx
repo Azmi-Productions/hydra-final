@@ -1,6 +1,7 @@
 import { useEffect, useState, MouseEventHandler, useCallback } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, Edit3, Loader2 } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, Edit3, Loader2,Play} from 'lucide-react';
 import toast from "../utils/toast";
+import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -25,10 +26,10 @@ interface Report {
   manpower_involved: string;
 
   // These optional fields must allow `null` from the database and during save.
-  excavation?: number | null;
-  sand?: number | null;
-  aggregate?: number | null;
-  premix?: number | null;
+  excavation?: Dimensions | null;
+  sand?: Dimensions | null;
+  aggregate?: Dimensions | null;
+  premix?: Dimensions | null;
   pipe_usage?: number | null;
 
   fittings?: string | null;
@@ -68,7 +69,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
   const inputStyle = `w-full border border-gray-300 p-2 rounded-lg text-sm ${isRejected ? 'bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500' : 'bg-gray-50'}`;
   const labelStyle = "text-xs font-semibold text-gray-600 mb-1 block";
 
-  const handleChange = (field: keyof Report, value: string | number) => {
+  const handleChange = (field: keyof Report, value: string | number | Dimensions | null) => {
     if (!isRejected) return;
     setEditableReport(prev => ({ ...prev, [field]: value } as any));
   };
@@ -209,21 +210,32 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
           <section className="space-y-4 pt-4">
             <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className={labelStyle}>Excavation (m³)</label>
-                <input type="text" value={editableReport.excavation ?? ""} onChange={(e) => handleChange("excavation", e.target.value)} readOnly={!isRejected} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Sand (m³)</label>
-                <input type="text" value={editableReport.sand ?? ""} onChange={(e) => handleChange("sand", e.target.value)} readOnly={!isRejected} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Aggregate (m³)</label>
-                <input type="text" value={editableReport.aggregate ?? ""} onChange={(e) => handleChange("aggregate", e.target.value)} readOnly={!isRejected} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Premix (kg)</label>
-                <input type="text" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} readOnly={!isRejected} className={inputStyle} />
+              <div className="col-span-2 sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <DimensionInput
+                      label="Excavation (m³)"
+                      value={editableReport.excavation || null}
+                      onChange={(val) => handleChange("excavation", val)}
+                      readOnly={!isRejected}
+                  />
+                  <DimensionInput
+                      label="Sand (m³)"
+                      value={editableReport.sand || null}
+                      onChange={(val) => handleChange("sand", val)}
+                      readOnly={!isRejected}
+                  />
+                  <DimensionInput
+                      label="Aggregate (m³)"
+                      value={editableReport.aggregate || null}
+                      onChange={(val) => handleChange("aggregate", val)}
+                      readOnly={!isRejected}
+                  />
+                  <DimensionInput
+                      label="Premix (kg)"
+                      value={editableReport.premix || null}
+                      onChange={(val) => handleChange("premix", val)}
+                      readOnly={!isRejected}
+                      showDepth={false}
+                  />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Pipe Usage (m)</label>
@@ -240,22 +252,53 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
           </p>
 
-          {report.photo_link && report.photo_link.length > 0 && (
-            <section className="space-y-4 pt-4">
-              <h3 className={sectionHeaderStyle}><FolderOpen className={iconStyle} /> Photos</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {report.photo_link.map((url, idx) => (
-                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={url}
-                      alt={`Report Photo ${idx + 1}`}
-                      className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                    />
-                  </a>
-                ))}
+         {report.photo_link && report.photo_link.length > 0 && (
+  <section className="space-y-4 pt-4">
+    <h3 className={sectionHeaderStyle}>
+      <FolderOpen className={iconStyle} /> Media Attachments
+    </h3>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {report.photo_link.map((url, idx) => {
+        // Detect video by file extension in URL
+        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+
+        return (
+          <a
+            key={idx}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block group"
+          >
+            {isVideo ? (
+              // Video preview with play indicator
+              <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                <video
+                  src={url}
+                  className="w-full h-full object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play className="w-5 h-5 text-white" />
+                </div>
               </div>
-            </section>
-          )}
+            ) : (
+              // Image preview
+              <img
+                src={url}
+                alt={`Attachment ${idx + 1}`}
+                className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
+                loading="lazy"
+              />
+            )}
+          </a>
+        );
+      })}
+    </div>
+  </section>
+)}
 
           {/* Remarks */}
           <section className="space-y-4 pt-4">

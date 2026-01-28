@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus } from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 
@@ -183,13 +183,18 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
 
   // const handleDelete ... (Updated to handle deleting specific report from tab)
-  const handleDelete = async () => {
-    const currentReport = reports[activeReportIdx];
-    if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
+  const handleDelete = async (reportId?: number) => {
+    // If no specific ID passed, use current (fallback for main delete button)
+    const targetId = reportId ?? reports[activeReportIdx].id;
+    const isCurrentActive = targetId === reports[activeReportIdx].id;
+
+    // Use custom toast confirmation
+    const confirmed = await toast.confirm("Are you sure you want to delete this report?");
+    if (!confirmed) return;
 
     setSaving(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${currentReport.id}`, {
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?id=eq.${targetId}`, {
         method: "DELETE",
         headers
       });
@@ -204,7 +209,19 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           onClose();
           window.location.reload();
       } else {
-          // Just reload tabs
+          // If we deleted the currently active report, switch to another one
+          if (isCurrentActive) {
+              const deletedIdx = reports.findIndex(r => r.id === targetId);
+              // Try to go to previous, or 0 if we were at 0
+              const nextIdx = deletedIdx > 0 ? deletedIdx - 1 : 0;
+              // We can't set activeReportIdx immediately to a safe value because reports state is old
+              // But fetchActivityReports will refresh content. 
+              // However, we should be careful about the momentary 404 or index out of bounds.
+              // Let's rely on fetchActivityReports logic (it handles some index drift) 
+              // BUT we should probably anticipate the shift.
+              setActiveReportIdx(Math.max(0, nextIdx));
+          }
+          // Reload tabs
           fetchActivityReports();
       }
 
@@ -298,21 +315,32 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             </h2>
             <div className="mt-4 flex flex-wrap items-center gap-2">
                 {reports.map((r, i) => (
-                    <button
-                        key={r.id}
-                        onClick={() => setActiveReportIdx(i)}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                            i === activeReportIdx 
-                            ? 'bg-indigo-600 text-white shadow-md' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                    >
-                        {r.submitted_by} 
-                        <span className={`ml-2 text-xs opacity-75 ${
-                            r.status === 'Approved' ? 'text-green-200' :
-                            r.status === 'Rejected' ? 'text-red-200' : ''
-                        }`}>({r.status})</span>
-                    </button>
+                    <div key={r.id} className="relative group">
+                        <button
+                            onClick={() => setActiveReportIdx(i)}
+                            className={`px-3 py-1 pr-6 rounded-full text-sm font-medium transition ${
+                                i === activeReportIdx 
+                                ? 'bg-indigo-600 text-white shadow-md' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            {r.submitted_by} 
+                            <span className={`ml-2 text-xs opacity-75 ${
+                                r.status === 'Approved' ? 'text-green-200' :
+                                r.status === 'Rejected' ? 'text-red-200' : ''
+                            }`}>({r.status})</span>
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(r.id);
+                            }}
+                            className={`absolute top-0 right-0 -mr-1 -mt-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50`}
+                            title="Remove Report"
+                        >
+                            <XCircle className="w-4 h-4 text-red-500" />
+                        </button>
+                    </div>
                 ))}
                 
                 {/* Add Supervisor Button */}
@@ -462,22 +490,51 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
           </p>
 
-          {editableReport.photo_link && editableReport.photo_link.length > 0 && (
-            <section className="space-y-4 pt-4">
-              <h3 className={sectionHeaderStyle}><FolderOpen className={iconStyle} /> Photos</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {editableReport.photo_link.map((url, idx) => (
-                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer">
-                    <img 
-                      src={url} 
-                      alt={`Report Photo ${idx + 1}`} 
-                      className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                    />
-                  </a>
-                ))}
+         {editableReport.photo_link && editableReport.photo_link.length > 0 && (
+  <section className="space-y-4 pt-4">
+    <h3 className={sectionHeaderStyle}>
+      <FolderOpen className={iconStyle} /> Media Attachments
+    </h3>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {editableReport.photo_link.map((url, idx) => {
+        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+
+        return (
+          <a
+            key={idx}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block group"
+          >
+            {isVideo ? (
+              <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                <video
+                  src={url}
+                  className="w-full h-full object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                {/* Optional: Play overlay on hover */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Play className="w-6 h-6 text-white" />
+                </div>
               </div>
-            </section>
-          )}
+            ) : (
+              <img
+                src={url}
+                alt={`Attachment ${idx + 1}`}
+                className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
+                loading="lazy"
+              />
+            )}
+          </a>
+        );
+      })}
+    </div>
+  </section>
+)}
 
           {/* Remarks */}
           <section className="space-y-4 pt-4">
@@ -494,7 +551,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-6">
             <button 
-              onClick={handleDelete} 
+              onClick={() => handleDelete()} 
               disabled={saving}
               className={`flex items-center px-5 py-2.5 rounded-xl transition font-semibold text-white ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 shadow-md'}`}
             >
@@ -675,7 +732,7 @@ export default function ReportsListPage() {
           
           const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
           const hasStarted = group.some(r => r.status === 'Started');
-          const hasApproved = group.some(r => r.status === 'Approved'); // Maybe check if ALL are approved?
+          
           
           // Let's use the layout of the latest report for details (date, damage type etc)
           // But status should reflect if there is 'work to do' (Pending)
