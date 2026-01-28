@@ -30,6 +30,7 @@ interface Report {
   sand?: number | null;
   aggregate?: number | null;
   premix?: number | null;
+  cement?: number | null;
   pipe_usage?: number | null;
   
   fittings?: string | null;
@@ -121,11 +122,18 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      if (!confirm(`Assign ${username} to this activity?`)) return;
      setSaving(true);
      try {
+        // Use Malaysia time zone
+        const now = new Date();
+        const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+        const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+        const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
+        const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+
         const payload = {
            activity_id: report.activity_id,
-           date: new Date().toISOString().slice(0, 10),
-           start_time: new Date().toTimeString().slice(0, 5),
-           day: new Date().toLocaleDateString("en-US", { weekday: "long" }),
+           date: todayStr,
+           start_time: timeStr,
+           day: weekdayStr,
            status: 'Started',
            submitted_by: username,
            // Copy basic location/timing from original if available, or leave blank?
@@ -153,7 +161,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      }
   };
 
-  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
+  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
 
   const handleChange = (field: keyof Report, value: string | number) => {
@@ -467,6 +475,10 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
               <div className="space-y-1">
                 <label className={labelStyle}>Premix (kg)</label>
                 <input type="number" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} className={inputStyle} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelStyle}>Cement (kg)</label>
+                <input type="number" value={editableReport.cement ?? ""} onChange={(e) => handleChange("cement", e.target.value)} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Pipe Usage (m)</label>
@@ -840,9 +852,9 @@ export default function ReportsListPage() {
 
     // Define columns
     const headers = [
-      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)", 
-      "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)", 
-      "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Pipe Usage (m)", "Fittings", 
+      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)",
+      "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)",
+      "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Cement (kg)", "Pipe Usage (m)", "Fittings",
       "Remarks", "Start Lat", "Start Long", "End Lat", "End Long", "Status", "Submitted By"
     ];
 
@@ -872,6 +884,7 @@ export default function ReportsListPage() {
         escapeCSV(row.sand || 0),
         escapeCSV(row.aggregate || 0),
         escapeCSV(row.premix || 0),
+        escapeCSV(row.cement || 0),
         escapeCSV(row.pipe_usage || 0),
         escapeCSV(row.fittings),
         escapeCSV(row.remarks), 
@@ -994,11 +1007,16 @@ export default function ReportsListPage() {
               )}
 
               {activeTab === 'Approved' && (
-                <Section 
-                  title="Approved Reports" 
-                  color="#10b981" 
+                <Section
+                  title="Approved Reports"
+                  color="#10b981"
                   count={approvedReports.length}
-                  onExport={() => exportToCSV(approvedReports, `approved_reports_${new Date().toISOString().split('T')[0]}.csv`)}
+                  onExport={() => {
+                    const now = new Date();
+                    const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+                    const todayStr = malaysiaTime.toLocaleDateString("en-GB", {timeZone: "Asia/Kuala_Lumpur"}).replace(/\//g, '-'); // DD-MM-YYYY for filename
+                    exportToCSV(approvedReports, `approved_reports_${todayStr}.csv`);
+                  }}
                 >
                   {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
                   <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
