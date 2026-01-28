@@ -471,7 +471,13 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     let fitList = activity.fittings;
     if (typeof fitList === 'string') {
-        try { fitList = JSON.parse(fitList); } catch(e) { fitList = []; }
+        // Try to parse as JSON array first
+        try {
+            fitList = JSON.parse(fitList);
+        } catch(e) {
+            // If JSON parsing fails, treat as comma-separated string
+            fitList = fitList.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        }
     }
     setFittings(Array.isArray(fitList) ? fitList : []);
 
