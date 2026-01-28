@@ -17,16 +17,27 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const REPORT_TABLE = "reports";
 
-// Fixed captions based on the reference image
+// Updated captions for 19 categories
 const CAPTIONS = [
-    "WAKIL SYABAS DITAPAK",
-    "PENYEDIAAN PERALATAN KESELAMATAN (I)",
-    "LOKASI KEBOCORAN",
-    "KERJA-KERJA PEMOTONGAN JALAN (I)",
-    "KERJA-KERJA PEMOTONGAN JALAN (II)",
-    "KERJA-KERJA PENGOREKAN (I)",
-    "KERJA-KERJA PENGOREKAN (II)",
-    "KERJA-KERJA PEMBAIKAN (I)"
+    "wakil syabas di tapak",
+    "penyediaan peralatan keselamatan",
+    "lokasi kebocoran",
+    "kerja-kerja pemotongan jalan",
+    "kerja-kerja pengorekan",
+    "kerja-kerja pembaikan",
+    "barangan rosak/lama",
+    "barangan yang akan diganti",
+    "kerja memasukkan pasir",
+    "kerja-kerja mampatan pasir lapisan pertama",
+    "kerja-kerja mampatan batu pecah",
+    "kerja-kerja pembaikan",
+    "kerja telah siap sepenuhnya",
+    "Gambar papan putih",
+    "gambar pengesahan tapak",
+    "Gambar point bocor untuk kerja pembaikan",
+    "gambar point bocor yang telah pembaikan",
+    "gambara barang lama yang telah rosak",
+    "gambar barang baru yang telah ditukar"
 ];
 
 // Helper to safely get photo or placeholder

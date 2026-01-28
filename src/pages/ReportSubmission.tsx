@@ -4,6 +4,44 @@ import { MapPin, Calendar, Briefcase, Camera, X, Loader2, ArrowLeft } from 'luci
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
 import { MaintenanceReportTemplate } from './MaintenanceReport';
+
+// Maintenance categories with English/Malay labels
+const MAINTENANCE_CATEGORIES = [
+  { key: 'wakil_syabas', label: 'Representative at Site / wakil syabas di tapak' },
+  { key: 'penyediaan_peralatan', label: 'Safety Equipment Preparation / penyediaan peralatan keselamatan' },
+  { key: 'lokasi_kebocoran', label: 'Leak Location / lokasi kebocoran' },
+  { key: 'pemotongan_jalan', label: 'Road Cutting Works / kerja-kerja pemotongan jalan' },
+  { key: 'pengorekan', label: 'Excavation Works / kerja-kerja pengorekan' },
+  { key: 'pembaikan1', label: 'Repair Works / kerja-kerja pembaikan' },
+  { key: 'barangan_rosak', label: 'Damaged/Old Items / barangan rosak/lama' },
+  { key: 'barangan_ganti', label: 'Items to be Replaced / barangan yang akan diganti' },
+  { key: 'masukkan_pasir', label: 'Sand Filling Works / kerja memasukkan pasir' },
+  { key: 'mampatan_pasir', label: 'First Layer Sand Compaction Works / kerja-kerja mampatan pasir lapisan pertama' },
+  { key: 'mampatan_batu', label: 'Aggregate Compaction Works / kerja-kerja mampatan batu pecah' },
+  { key: 'pembaikan2', label: 'Repair Works / kerja-kerja pembaikan' },
+  { key: 'siap_sepenuhnya', label: 'Work Fully Completed / kerja telah siap sepenuhnya' },
+  { key: 'gambar_papan_putih', label: 'Whiteboard Picture / Gambar papan putih' },
+  { key: 'gambar_pengesahan', label: 'Site Confirmation Picture / gambar pengesahan tapak' },
+  { key: 'gambar_point_bocor_pembaikan', label: 'Leak Point Picture for Repair Work / Gambar point bocor untuk kerja pembaikan' },
+  { key: 'gambar_point_bocor_sudah', label: 'Leak Point Picture After Repair / gambar point bocor yang telah pembaikan' },
+  { key: 'gambar_barang_lama', label: 'Picture of Old Damaged Items / gambara barang lama yang telah rosak' },
+  { key: 'gambar_barang_baru', label: 'Picture of New Replaced Items / gambar barang baru yang telah ditukar' },
+];
+
+// Premix categories with English/Malay labels
+const PREMIX_CATEGORIES = [
+  { key: 'kedalaman_keseluruhan', label: 'Overall Depth Picture / gambar kedalaman keseluruhan' },
+  { key: 'kedalaman_premix_kedua', label: 'Second Layer Premix Depth Picture / gambar kedalaman premix lapisan kedua' },
+  { key: 'tack_coat_pertama', label: 'First Layer Tack Coat Placement Picture / Gambar meletakkan tack coat lapisan pertama' },
+  { key: 'mampatan_premix_pertama', label: 'First Layer Premix Compaction Works / kerja-kerja mampatan premix lapisan pertama' },
+  { key: 'tack_coat_kedua', label: 'Second Layer Tack Coat Placement Picture / gambar meletakkan tack coat lapisan kedua' },
+  { key: 'mampatan_premix_kedua', label: 'Second Layer Premix Compaction Works / kerja-kerja mampatan premix lapisan kedua' },
+  { key: 'keluasan_turapan', label: 'Pavement Area Picture / gambar keluasan turapan' },
+  { key: 'kerja_turapan_siap', label: 'Finished Pavement Work Picture / gambar kerja turapan siap' },
+  { key: 'pengesahan_tapak', label: 'Site Confirmation Picture / gambar pengesahan tapak' },
+  { key: 'ukuran_premix', label: 'Premix Size Picture / gambar ukuran premix' },
+  { key: 'label_premix', label: 'Premix Label Picture / gambar label premix' },
+];
 //old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -206,6 +244,20 @@ export default function ReportSubmissionPage() {
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [maintenancePhotos, setMaintenancePhotos] = useState<Record<string, {files: File[], urls: string[]}>>(() => {
+    const initial: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach(cat => {
+      initial[cat.key] = {files: [], urls: []};
+    });
+    return initial;
+  });
+  const [premixPhotos, setPremixPhotos] = useState<Record<string, {files: File[], urls: string[]}>>(() => {
+    const initial: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach(cat => {
+      initial[cat.key] = {files: [], urls: []};
+    });
+    return initial;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
@@ -260,6 +312,82 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
   // Add valid files
   setPhotoFiles(prev => [...prev, ...newValidFiles]);
 };
+
+const handleMaintenanceFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    } else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Allow up to 10 files per category
+  const currentFiles = maintenancePhotos[categoryKey].files.length + maintenancePhotos[categoryKey].urls.length;
+  if (currentFiles + newValidFiles.length > 10) {
+    toast.error(`Maximum 10 files allowed per category.`);
+    return;
+  }
+
+  setMaintenancePhotos(prev => ({
+    ...prev,
+    [categoryKey]: {
+      ...prev[categoryKey],
+      files: [...prev[categoryKey].files, ...newValidFiles]
+    }
+  }));
+};
+
+const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    } else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Allow up to 10 files per category
+  const currentFiles = premixPhotos[categoryKey].files.length + premixPhotos[categoryKey].urls.length;
+  if (currentFiles + newValidFiles.length > 10) {
+    toast.error(`Maximum 10 files allowed per category.`);
+    return;
+  }
+
+  setPremixPhotos(prev => ({
+    ...prev,
+    [categoryKey]: {
+      ...prev[categoryKey],
+      files: [...prev[categoryKey].files, ...newValidFiles]
+    }
+  }));
+};
   const fetchStartedActivities = async () => {
     const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=eq.Started&submitted_by=eq.${username}`, {
       headers: {
@@ -302,6 +430,20 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSelectedActivity(null);
         setPhotoFiles([]);
         setUploadedPhotoUrls([]);
+        setMaintenancePhotos(() => {
+          const initial: Record<string, {files: File[], urls: string[]}> = {};
+          MAINTENANCE_CATEGORIES.forEach(cat => {
+            initial[cat.key] = {files: [], urls: []};
+          });
+          return initial;
+        });
+        setPremixPhotos(() => {
+          const initial: Record<string, {files: File[], urls: string[]}> = {};
+          PREMIX_CATEGORIES.forEach(cat => {
+            initial[cat.key] = {files: [], urls: []};
+          });
+          return initial;
+        });
       }
       
       fetchStartedActivities();
@@ -494,7 +636,51 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRemarks(activity.remarks || "");
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
-    setUploadedPhotoUrls(activity.photo_link || []);
+
+    // Handle photos if photo_link is JSON object (array or string)
+    let photoData: {maintenance?: Record<string, string[]>, premix?: Record<string, string[]>} = {};
+    if (activity.photo_link) {
+      if (Array.isArray(activity.photo_link) && activity.photo_link.length > 0) {
+        try {
+          const parsed = JSON.parse(activity.photo_link[0]);
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            photoData = parsed;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+      } else if (typeof activity.photo_link === 'string') {
+        try {
+          const parsed = JSON.parse(activity.photo_link);
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            photoData = parsed;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+      }
+    }
+
+    // Set maintenance photos
+    const newMaintenancePhotos: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach(cat => {
+      newMaintenancePhotos[cat.key] = {files: [], urls: (photoData.maintenance && photoData.maintenance[cat.key]) || []};
+    });
+    setMaintenancePhotos(newMaintenancePhotos);
+
+    // Set premix photos
+    const newPremixPhotos: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach(cat => {
+      newPremixPhotos[cat.key] = {files: [], urls: (photoData.premix && photoData.premix[cat.key]) || []};
+    });
+    setPremixPhotos(newPremixPhotos);
+
+    // For backward compatibility, set uploadedPhotoUrls if it's an array
+    if (Array.isArray(activity.photo_link)) {
+      setUploadedPhotoUrls(activity.photo_link);
+    } else {
+      setUploadedPhotoUrls([]);
+    }
   }
 
   const handleSaveDraft = async () => {
@@ -592,6 +778,104 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
+    // Upload maintenance photos
+    const maintenancePhotoUrls: Record<string, string[]> = {};
+    for (const cat of MAINTENANCE_CATEGORIES) {
+      const catPhotos = maintenancePhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        maintenancePhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        maintenancePhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Upload premix photos
+    const premixPhotoUrls: Record<string, string[]> = {};
+    for (const cat of PREMIX_CATEGORIES) {
+      const catPhotos = premixPhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        premixPhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        premixPhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Clear local files
+    setMaintenancePhotos(prev => {
+      const newState: Record<string, {files: File[], urls: string[]}> = {};
+      MAINTENANCE_CATEGORIES.forEach(cat => {
+        newState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
+      });
+      return newState;
+    });
+    setPremixPhotos(prev => {
+      const newState: Record<string, {files: File[], urls: string[]}> = {};
+      PREMIX_CATEGORIES.forEach(cat => {
+        newState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
+      });
+      return newState;
+    });
+
+    // Set photo_link as JSON string wrapped in array for text[] column
+    const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
+    const photoLinkData = JSON.stringify(photoData);
+
     const payload = {
         date,
         start_time: startTime,
@@ -610,7 +894,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         fittings: finalFittingsList,
         remarks,
         // Do not update end location for draft
-        photo_link: photoLinks,
+        photo_link: [photoLinkData],
         status: "Started", // IMPORTANT: Keep status as Started
       };
 
@@ -641,7 +925,14 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       setSelectedActivity(null);
       setPhotoFiles([]);
       setUploadedPhotoUrls([]);
-      
+      setPremixPhotos(() => {
+        const initial: Record<string, {files: File[], urls: string[]}> = {};
+        PREMIX_CATEGORIES.forEach(cat => {
+          initial[cat.key] = {files: [], urls: []};
+        });
+        return initial;
+      });
+
       fetchStartedActivities();
       
     } catch (err) {
@@ -712,6 +1003,103 @@ const handleSubmit = async () => {
       setUploadedPhotoUrls(photoLinks);
       setPhotoFiles([]);
     }
+
+    // Upload maintenance photos
+    const maintenancePhotoUrls: Record<string, string[]> = {};
+    for (const cat of MAINTENANCE_CATEGORIES) {
+      const catPhotos = maintenancePhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        maintenancePhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        maintenancePhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Upload premix photos
+    const premixPhotoUrls: Record<string, string[]> = {};
+    for (const cat of PREMIX_CATEGORIES) {
+      const catPhotos = premixPhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        premixPhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        premixPhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Clear local files
+    setMaintenancePhotos(prev => {
+      const newState: Record<string, {files: File[], urls: string[]}> = {};
+      MAINTENANCE_CATEGORIES.forEach(cat => {
+        newState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
+      });
+      return newState;
+    });
+    setPremixPhotos(prev => {
+      const newState: Record<string, {files: File[], urls: string[]}> = {};
+      PREMIX_CATEGORIES.forEach(cat => {
+        newState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
+      });
+      return newState;
+    });
+    // Set photo_link as JSON string
+    const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
+    const photoLinkData = JSON.stringify(photoData);
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
@@ -796,7 +1184,7 @@ const handleSubmit = async () => {
       end_latitude: latitude,
       end_longitude: longitude,
       end_gmap_link: gmapLink,
-      photo_link: photoLinks,
+      photo_link: [photoLinkData],
       status: "Pending",
     };
 
@@ -848,6 +1236,20 @@ const handleSubmit = async () => {
                   setSelectedActivity(null);
                   setPhotoFiles([]);
                   setUploadedPhotoUrls([]);
+                  setMaintenancePhotos(() => {
+                    const initial: Record<string, {files: File[], urls: string[]}> = {};
+                    MAINTENANCE_CATEGORIES.forEach(cat => {
+                      initial[cat.key] = {files: [], urls: []};
+                    });
+                    return initial;
+                  });
+                  setPremixPhotos(() => {
+                    const initial: Record<string, {files: File[], urls: string[]}> = {};
+                    PREMIX_CATEGORIES.forEach(cat => {
+                      initial[cat.key] = {files: [], urls: []};
+                    });
+                    return initial;
+                  });
                 }}
                 className="p-2 rounded-full hover:bg-gray-200 transition-colors"
                 title="Back to Activity List"
@@ -1106,34 +1508,166 @@ const handleSubmit = async () => {
               </div>
            )}
 
-           {/* MAINTENANCE TAB - Live Report Preview */}
+           {/* MAINTENANCE TAB - Form for 19 categories */}
            {selectedActivity && activeTab === 'Maintenance' && (
-              <div className="bg-gray-200 shadow-inner rounded-3xl p-6 border border-gray-300 animate-slide-down flex justify-center overflow-x-auto">
-                   <div style={{ transform: 'scale(0.8)', transformOrigin: 'top center' }}>
-                        <MaintenanceReportTemplate 
-                            data={{
-                                id: 0, // Temporary ID
-                                activity_id: activityId || "N/A",
-                                date: date || "",
-                                start_time: startTime || "",
-                                end_time: endTime || "In Progress",
-                                address: remarks || "No Address Provided", // Using Remarks as address for now
-                                // Combine uploaded URLs and local file previews
-                                photos: [
-                                    ...uploadedPhotoUrls,
-                                    ...photoFiles.map(f => URL.createObjectURL(f))
-                                ]
-                            }}
-                        />
-                   </div>
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down">
+                  {MAINTENANCE_CATEGORIES.map((cat) => {
+                    const photos = maintenancePhotos[cat.key];
+                    return (
+                      <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                        <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
+                        <label htmlFor={`maintenance-upload-${cat.key}`} className="block cursor-pointer">
+                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-1 text-center">
+                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                            </div>
+                          </div>
+                        </label>
+                        <input id={`maintenance-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleMaintenanceFileSelect(cat.key)} className="sr-only"/>
+                        {(photos.files.length > 0 || photos.urls.length > 0) && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {photos.urls.map((url, idx) => (
+                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                                <img src={url} className="w-full h-full object-cover" />
+                                <button onClick={() => {
+                                  setMaintenancePhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      urls: prev[cat.key].urls.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {photos.files.map((file, idx) => (
+                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                                <button onClick={() => {
+                                  setMaintenancePhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Actions for Maintenance Tab */}
+                <div className="flex flex-col gap-3 mt-8">
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                  >
+                     Save Draft
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                      isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                    {isSubmitting ? "Submitting..." : "Submit Report"}
+                  </button>
+                </div>
+              </>
            )}
 
-           {/* PREMIX TAB - Empty for now */}
+           {/* PREMIX TAB - Form for 11 categories */}
            {selectedActivity && activeTab === 'Premix' && (
-              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 animate-slide-down min-h-[300px] flex items-center justify-center text-gray-400">
-                 <p className="italic">Premix content will be moved here in future.</p>
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down">
+                  {PREMIX_CATEGORIES.map((cat) => {
+                    const photos = premixPhotos[cat.key];
+                    return (
+                      <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                        <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
+                        <label htmlFor={`premix-upload-${cat.key}`} className="block cursor-pointer">
+                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-1 text-center">
+                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                            </div>
+                          </div>
+                        </label>
+                        <input id={`premix-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handlePremixFileSelect(cat.key)} className="sr-only"/>
+                        {(photos.files.length > 0 || photos.urls.length > 0) && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {photos.urls.map((url, idx) => (
+                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                                <img src={url} className="w-full h-full object-cover" />
+                                <button onClick={() => {
+                                  setPremixPhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      urls: prev[cat.key].urls.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {photos.files.map((file, idx) => (
+                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                                <button onClick={() => {
+                                  setPremixPhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Actions for Premix Tab */}
+                <div className="flex flex-col gap-3 mt-8">
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                  >
+                     Save Draft
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                      isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                    {isSubmitting ? "Submitting..." : "Submit Report"}
+                  </button>
+                </div>
+              </>
            )}
 
 
