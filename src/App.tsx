@@ -12,6 +12,7 @@ import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
 import LocationHistoryPage from "./pages/LocationHistory.tsx";
 
+
 function AppWrapper() {
   const location = useLocation();
   const hideSidebar = ["/", "/login", "/register"].includes(location.pathname);
@@ -105,6 +106,9 @@ function AppWrapper() {
               </ProtectedRoute>
             }
           />
+
+         
+          
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />

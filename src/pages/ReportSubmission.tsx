@@ -1,8 +1,47 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Loader2, ArrowLeft } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
+
+
+// Maintenance categories with English/Malay labels
+const MAINTENANCE_CATEGORIES = [
+  { key: 'wakil_syabas', label: 'Wakil Syabas di tapak / Representative at Site' },
+  { key: 'penyediaan_peralatan', label: 'Penyediaan peralatan keselamatan / Safety Equipment Preparation' },
+  { key: 'lokasi_kebocoran', label: 'Lokasi Kebocoran / Leak Location' },
+  { key: 'pemotongan_jalan', label: 'Kerja-kerja Pemotongan Jalan / Road Cutting Works' },
+  { key: 'pengorekan', label: 'Kerja-kerja Pengorekan / Excavation Works' },
+  { key: 'pembaikan1', label: 'Kerja-kerja Pembaikan / Repair Works' },
+  { key: 'barangan_rosak', label: 'Barangan yang telah rosak/lama / Damaged/Old Items' },
+  { key: 'barangan_ganti', label: 'Barangan yang akan diganti / Items to be Replaced' },
+  { key: 'masukkan_pasir', label: 'Kerja memasukkan pasir / Sand Filling Works' },
+  { key: 'mampatan_pasir', label: 'Kerja-kerja mampatan pasir lapisan pertama / First Layer Sand Compaction Works' },
+  { key: 'mampatan_batu', label: 'Kerja-kerja mampatan batu pecah / Aggregate Compaction Works' },
+  { key: 'pembaikan2', label: 'Kerja-kerja Pembaikan / Repair Works' },
+  { key: 'siap_sepenuhnya', label: 'Kerja telah siap sepenuhnya / Work Fully Completed' },
+  { key: 'gambar_papan_putih', label: 'Gambar Papan Putih / Whiteboard Picture' },
+  { key: 'gambar_pengesahan', label: 'Gambar Pengesahan Tapak / Site Confirmation Picture' },
+  { key: 'gambar_point_bocor_pembaikan', label: 'Gambar Point Bocor untuk Kerja Pembaikan / Leak Point Picture for Repair Work' },
+  { key: 'gambar_point_bocor_sudah', label: 'Gambar Point Bocor yang telah Pembaikan / Leak Point Picture After Repair' },
+  { key: 'gambar_barang_lama', label: 'Gambar Barang Lama yang telah rosak / Picture of Old Damaged Items' },
+  { key: 'gambar_barang_baru', label: 'Gambar Barang Baru yang telah ditukar / Picture of New Replaced Items' },
+];
+
+// Premix categories with English/Malay labels
+const PREMIX_CATEGORIES = [
+  { key: 'kedalaman_keseluruhan', label: 'Gambar Kedalaman Keseluruhan / Overall Depth Picture' },
+  { key: 'kedalaman_premix_kedua', label: 'Gambar Kedalaman Premix Lapisan Kedua / Second Layer Premix Depth Picture' },
+  { key: 'tack_coat_pertama', label: 'Gambar Meletakkan Tack Coat Lapisan Pertama / First Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_pertama', label: 'Kerja-kerja Mampatan Premix Lapisan Pertama / First Layer Premix Compaction Works' },
+  { key: 'tack_coat_kedua', label: 'Gambar Meletakkan Tack Coat Lapisan Kedua / Second Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_kedua', label: 'Kerja-kerja Mampatan Premix Lapisan Kedua / Second Layer Premix Compaction Works' },
+  { key: 'keluasan_turapan', label: 'Gambar Keluasan Turapan / Pavement Area Picture' },
+  { key: 'kerja_turapan_siap', label: 'Gambar Kerja Turapan Siap / Finished Pavement Work Picture' },
+  { key: 'pengesahan_tapak', label: 'Gambar Pengesahan Tapak / Site Confirmation Picture' },
+  { key: 'ukuran_premix', label: 'Gambar Ukuran Premix / Premix Size Picture' },
+  { key: 'label_premix', label: 'Gambar Label Premix / Premix Label Picture' },
+];
 //old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -205,8 +244,23 @@ export default function ReportSubmissionPage() {
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
+  const [maintenancePhotos, setMaintenancePhotos] = useState<Record<string, {files: File[], urls: string[]}>>(() => {
+    const initial: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach(cat => {
+      initial[cat.key] = {files: [], urls: []};
+    });
+    return initial;
+  });
+  const [premixPhotos, setPremixPhotos] = useState<Record<string, {files: File[], urls: string[]}>>(() => {
+    const initial: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach(cat => {
+      initial[cat.key] = {files: [], urls: []};
+    });
+    return initial;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
 
   const username = getCookie("username") || "Unknown";
 
@@ -258,6 +312,82 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
   // Add valid files
   setPhotoFiles(prev => [...prev, ...newValidFiles]);
 };
+
+const handleMaintenanceFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    } else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Allow up to 10 files per category
+  const currentFiles = maintenancePhotos[categoryKey].files.length + maintenancePhotos[categoryKey].urls.length;
+  if (currentFiles + newValidFiles.length > 10) {
+    toast.error(`Maximum 10 files allowed per category.`);
+    return;
+  }
+
+  setMaintenancePhotos(prev => ({
+    ...prev,
+    [categoryKey]: {
+      ...prev[categoryKey],
+      files: [...prev[categoryKey].files, ...newValidFiles]
+    }
+  }));
+};
+
+const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  const newValidFiles: File[] = [];
+
+  for (const file of files) {
+    const sizeInMB = file.size / (1024 * 1024);
+
+    if (file.type.startsWith('video/')) {
+      if (sizeInMB > MAX_VIDEO_SIZE_MB) {
+        toast.error(`Video "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Max allowed: ${MAX_VIDEO_SIZE_MB} MB.`);
+        continue;
+      }
+    } else if (file.type.startsWith('image/') && sizeInMB > MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION) {
+      toast.error(`Image "${file.name}" is too large (${sizeInMB.toFixed(1)} MB). Please choose a smaller image.`);
+      continue;
+    }
+
+    newValidFiles.push(file);
+  }
+
+  // Allow up to 10 files per category
+  const currentFiles = premixPhotos[categoryKey].files.length + premixPhotos[categoryKey].urls.length;
+  if (currentFiles + newValidFiles.length > 10) {
+    toast.error(`Maximum 10 files allowed per category.`);
+    return;
+  }
+
+  setPremixPhotos(prev => ({
+    ...prev,
+    [categoryKey]: {
+      ...prev[categoryKey],
+      files: [...prev[categoryKey].files, ...newValidFiles]
+    }
+  }));
+};
   const fetchStartedActivities = async () => {
     const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=eq.Started&submitted_by=eq.${username}`, {
       headers: {
@@ -300,6 +430,17 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSelectedActivity(null);
         setPhotoFiles([]);
         setUploadedPhotoUrls([]);
+        const initialMaintenance: Record<string, {files: File[], urls: string[]}> = {};
+        MAINTENANCE_CATEGORIES.forEach((cat) => {
+          initialMaintenance[cat.key] = {files: [], urls: []};
+        });
+        setMaintenancePhotos(initialMaintenance);
+        
+        const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+        PREMIX_CATEGORIES.forEach((cat) => {
+          initialPremix[cat.key] = {files: [], urls: []};
+        });
+        setPremixPhotos(initialPremix);
       }
       
       fetchStartedActivities();
@@ -492,7 +633,51 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRemarks(activity.remarks || "");
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
-    setUploadedPhotoUrls(activity.photo_link || []);
+
+    // Handle photos if photo_link is JSON object (array or string)
+    let photoData: {maintenance?: Record<string, string[]>, premix?: Record<string, string[]>} = {};
+    if (activity.photo_link) {
+      if (Array.isArray(activity.photo_link) && activity.photo_link.length > 0) {
+        try {
+          const parsed = JSON.parse(activity.photo_link[0]);
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            photoData = parsed;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+      } else if (typeof activity.photo_link === 'string') {
+        try {
+          const parsed = JSON.parse(activity.photo_link);
+          if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            photoData = parsed;
+          }
+        } catch (e) {
+          // Not JSON, keep as is
+        }
+      }
+    }
+
+    // Set maintenance photos
+    const newMaintenancePhotos: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach(cat => {
+      newMaintenancePhotos[cat.key] = {files: [], urls: (photoData.maintenance && photoData.maintenance[cat.key]) || []};
+    });
+    setMaintenancePhotos(newMaintenancePhotos);
+
+    // Set premix photos
+    const newPremixPhotos: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach(cat => {
+      newPremixPhotos[cat.key] = {files: [], urls: (photoData.premix && photoData.premix[cat.key]) || []};
+    });
+    setPremixPhotos(newPremixPhotos);
+
+    // For backward compatibility, set uploadedPhotoUrls if it's an array
+    if (Array.isArray(activity.photo_link)) {
+      setUploadedPhotoUrls(activity.photo_link);
+    } else {
+      setUploadedPhotoUrls([]);
+    }
   }
 
   const handleSaveDraft = async () => {
@@ -590,6 +775,101 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
+    // Upload maintenance photos
+    const maintenancePhotoUrls: Record<string, string[]> = {};
+    for (const cat of MAINTENANCE_CATEGORIES) {
+      const catPhotos = maintenancePhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        maintenancePhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        maintenancePhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Upload premix photos
+    const premixPhotoUrls: Record<string, string[]> = {};
+    for (const cat of PREMIX_CATEGORIES) {
+      const catPhotos = premixPhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        premixPhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        premixPhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Clear local files
+    const maintenanceState: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach((cat) => {
+      maintenanceState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
+    });
+    setMaintenancePhotos(maintenanceState);
+
+    const premixState: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach((cat) => {
+      premixState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
+    });
+    setPremixPhotos(premixState);
+
+    // Set photo_link as JSON string wrapped in array for text[] column
+    const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
+    const photoLinkData = JSON.stringify(photoData);
+
     const payload = {
         date,
         start_time: startTime,
@@ -608,7 +888,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         fittings: finalFittingsList,
         remarks,
         // Do not update end location for draft
-        photo_link: photoLinks,
+        photo_link: [photoLinkData],
         status: "Started", // IMPORTANT: Keep status as Started
       };
 
@@ -639,7 +919,12 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       setSelectedActivity(null);
       setPhotoFiles([]);
       setUploadedPhotoUrls([]);
-      
+      const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+      PREMIX_CATEGORIES.forEach((cat) => {
+        initialPremix[cat.key] = {files: [], urls: []};
+      });
+      setPremixPhotos(initialPremix);
+
       fetchStartedActivities();
       
     } catch (err) {
@@ -710,6 +995,100 @@ const handleSubmit = async () => {
       setUploadedPhotoUrls(photoLinks);
       setPhotoFiles([]);
     }
+
+    // Upload maintenance photos
+    const maintenancePhotoUrls: Record<string, string[]> = {};
+    for (const cat of MAINTENANCE_CATEGORIES) {
+      const catPhotos = maintenancePhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        maintenancePhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        maintenancePhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Upload premix photos
+    const premixPhotoUrls: Record<string, string[]> = {};
+    for (const cat of PREMIX_CATEGORIES) {
+      const catPhotos = premixPhotos[cat.key];
+      if (catPhotos.files.length > 0) {
+        const uploadPromises = catPhotos.files.map(async (file) => {
+          try {
+            let finalFile = file;
+            if (file.type.startsWith('image/')) {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              finalFile = await imageCompression(file, options);
+            }
+            const formData = new FormData();
+            formData.append("file", finalFile);
+            const uploadRes = await fetch("https://azmiproductions.com/api/hydra/upload.php", {
+              method: "POST",
+              body: formData,
+            });
+            if (!uploadRes.ok) throw new Error("Upload failed");
+            const data = await uploadRes.json();
+            return data.url;
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            toast.error(`Failed to upload one of the images for ${cat.label}.`);
+            return null;
+          }
+        });
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter((url): url is string => url !== null);
+        premixPhotoUrls[cat.key] = [...catPhotos.urls, ...successfulUploads];
+      } else {
+        premixPhotoUrls[cat.key] = catPhotos.urls;
+      }
+    }
+
+    // Clear local files
+    const maintenanceStateSubmit: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach((cat) => {
+      maintenanceStateSubmit[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
+    });
+    setMaintenancePhotos(maintenanceStateSubmit);
+
+    const premixStateSubmit: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach((cat) => {
+      premixStateSubmit[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
+    });
+    setPremixPhotos(premixStateSubmit);
+    // Set photo_link as JSON string
+    const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
+    const photoLinkData = JSON.stringify(photoData);
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
@@ -794,7 +1173,7 @@ const handleSubmit = async () => {
       end_latitude: latitude,
       end_longitude: longitude,
       end_gmap_link: gmapLink,
-      photo_link: photoLinks,
+      photo_link: [photoLinkData],
       status: "Pending",
     };
 
@@ -846,6 +1225,17 @@ const handleSubmit = async () => {
                   setSelectedActivity(null);
                   setPhotoFiles([]);
                   setUploadedPhotoUrls([]);
+                  const initialMaintenance: Record<string, {files: File[], urls: string[]}> = {};
+                  MAINTENANCE_CATEGORIES.forEach((cat) => {
+                    initialMaintenance[cat.key] = {files: [], urls: []};
+                  });
+                  setMaintenancePhotos(initialMaintenance);
+                  
+                  const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+                  PREMIX_CATEGORIES.forEach((cat) => {
+                    initialPremix[cat.key] = {files: [], urls: []};
+                  });
+                  setPremixPhotos(initialPremix);
                 }}
                 className="p-2 rounded-full hover:bg-gray-200 transition-colors"
                 title="Back to Activity List"
@@ -862,324 +1252,402 @@ const handleSubmit = async () => {
           </p>
         </header>
 
-        {startedActivities.length > 0 && !selectedActivity && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-blue-700 mb-4">Started Activities</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {startedActivities.map((act, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white border border-gray-200 rounded-2xl shadow-md p-4 hover:shadow-xl transition cursor-pointer"
-                  onClick={() => selectActivity(act)}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-blue-600">{act.activity_id}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">{act.start_time}</span>
-                      <button 
-                        onClick={(e) => deleteActivity(e, act.activity_id)}
-                        className="p-1 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition"
-                        title="Cancel/Delete Activity"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {act.damage_type && (
-                    <p className="text-gray-700 text-sm mb-2">
-                      <span className="font-medium">Damage:</span> {act.damage_type}
-                    </p>
-                  )}
-                  {act.start_gmap_link && (
-                    <a
-                      href={act.start_gmap_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 text-sm hover:underline truncate block"
-                    >
-                      View Location
-                    </a>
-                  )}
-                  <div className="mt-2 text-right">
-                    <button className="text-white bg-blue-600 px-3 py-1 rounded-xl text-sm hover:bg-blue-700 transition">
-                      Select
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+
+
+        {/* Tabs moved to top, outside the grid */}
+        {selectedActivity && (
+          <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 backdrop-blur-sm border border-gray-200 shadow-sm max-w-2xl mx-auto">
+            {(['Report', 'Maintenance', 'Premix'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="space-y-8 lg:col-span-2">
-            <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-              <h2 className="flex items-center text-xl font-semibold text-blue-700 border-b pb-2">
-                <MapPin className="w-5 h-5 mr-2" /> Activity & Location Details
-              </h2>
-              <FormInput label="Activity ID" placeholder="Enter Activity ID" value={activityId} onChange={(e) => setActivityId(e.target.value)} />
-              <div className="space-y-4">
-                <div className="hidden">
-  <FormInput label="Latitude" placeholder="Latitude" value={latitude ?? ""} readOnly />
-  <FormInput label="Longitude" placeholder="Longitude" value={longitude ?? ""} readOnly />
-  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink ?? ""} readOnly />
-</div>
 
-                
-                {!selectedActivity && (
-                  <button
-                    onClick={startActivity}
-                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl"
-                    disabled={isOngoing}
-                  >
-                    Start Activity
-                  </button>
-                )}
-              </div>
-            </div>
-            
+        {/* Unified Content Area */}
+        <div className={`transition-all duration-300 ${activeTab === 'Maintenance' ? 'max-w-5xl mx-auto' : 'max-w-7xl mx-auto'}`}> 
 
 
+           {/* --- TAB CONTENT --- */}
+           
+           {/* REPORT TAB or (!selectedActivity to show ID input) */}
+           {(!selectedActivity || activeTab === 'Report') && (
+           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-slide-down">
+                  
+                  {/* LEFT COLUMN: Activity & Timing */}
+                  <div className="xl:col-span-2 space-y-6">
+                      {/* Activity & Location Details */}
+                      <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                          <h2 className="flex items-center text-xl font-semibold text-blue-700 border-b pb-2">
+                            <MapPin className="w-5 h-5 mr-2" /> Activity & Location Details
+                          </h2>
+                          <FormInput label="Activity ID" placeholder="Enter Activity ID" value={activityId} onChange={(e) => setActivityId(e.target.value)} />
+                          
+                          {!selectedActivity && (
+                            <button
+                              onClick={startActivity}
+                              className="mt-2 px-6 py-3 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition font-semibold"
+                              disabled={isOngoing}
+                            >
+                              Start Activity
+                            </button>
+                          )}
+                      </div>
 
-            {selectedActivity && (
-              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-                <h2 className="flex items-center text-xl font-semibold text-green-700 border-b pb-2">
-                  <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
-                  <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
-                  <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
-                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
-                </div>
-                <hr className="border-gray-100 pt-3" />
-                <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
-              </div>
-            )}
-          </div>
+                      {/* Timing & Outcome (Only show if selected) */}
+                      {selectedActivity && (
+                        <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                          <h2 className="flex items-center text-xl font-semibold text-green-700 border-b pb-2">
+                            <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
+                          </h2>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                            <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
+                            <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
+                            <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
+                          </div>
+                          <hr className="border-gray-100 pt-3" />
+                          <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+                        </div>
+                      )}
+                  </div>
 
-          {selectedActivity && (
-            <div className="space-y-8 lg:col-span-1">
-              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-                <h2 className="flex items-center text-xl font-semibold text-purple-700 border-b pb-2">
-                  <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
-                </h2>
-
-                <ListInput 
-                  label="Peralatan Digunakan / Equipment Used" 
-                  items={equipmentList} 
-                  setItems={setEquipmentList} 
-                  placeholder="Add equipment" 
-                  inputValue={equipmentInput}
-                  setInputValue={setEquipmentInput}
-                />
-                <ListInput 
-                  label="Tenaga Kerja / Manpower Involved" 
-                  items={manpowerList} 
-                  setItems={setManpowerList} 
-                  placeholder="Add manpower" 
-                  inputValue={manpowerInput}
-                  setInputValue={setManpowerInput}
-                />
-                {/* Materials */}
-            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4 mt-8 flex items-center">
-               <Briefcase className="w-5 h-5 mr-2 text-blue-600" />
-               Materials Quantities
-            </h3>
-
-            <div className="space-y-4">
-               <DimensionInput
-                  label="Excavation (m³)"
-                  value={excavation}
-                  onChange={setExcavation}
-               />
-               <DimensionInput
-                  label="Sand (m³)"
-                  value={sand}
-                  onChange={setSand}
-               />
-               <DimensionInput
-                  label="Aggregate (m³)"
-                  value={aggregate}
-                  onChange={setAggregate}
-               />
-                <DimensionInput
-                  label="Premix (kg)"
-                  value={premix}
-                  onChange={setPremix}
-                  showDepth={false}
-               />
-               <DimensionInput
-                  label="Cement (kg)"
-                  value={cement}
-                  onChange={setCement}
-                  showDepth={false}
-               />
-               <FormInput
-                label="Pipe Usage (m)"
-                placeholder="e.g. 5"
-                type="number"
-                value={pipeUsage}
-                onChange={(e) => setPipeUsage(e.target.value)}
-              />
-              <ListInput
-                label="Fittings"
-                items={fittings}
-                setItems={setFittings}
-                placeholder="Add fitting"
-                inputValue={fittingsInput}
-                setInputValue={setFittingsInput}
-              />
-            </div>
-            <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-
-                {/* Photo Upload */}
-                <div className="mt-4">
-  <label className="text-base font-semibold text-gray-800 mb-2 block">
-    📸 Attach Photos & Evidence
-  </label>
-  
-  {/* --- 1. Custom File Input / Dropzone --- */}
-  <label htmlFor="file-upload" className="block cursor-pointer mb-4">
-    <div className="flex items-center justify-center h-20 border-2 border-dashed border-indigo-400 rounded-xl p-4 bg-indigo-50/70 hover:bg-indigo-100 transition-all duration-200 group">
-      <div className="flex items-center space-x-3 text-center">
-        <Camera className="w-5 h-5 text-indigo-600 group-hover:text-indigo-700 transition-colors" />
-        <p className="text-sm font-semibold text-indigo-700">
-          Tap here to select images
-        </p>
-        <p className="text-xs text-gray-500 hidden sm:block">
-          (Multiple files | Accepts image/*)
-        </p>
-      </div>
-    </div>
-  </label>
-
-  {/* Hidden native input */}
- <input
-  id="file-upload"
-  type="file"
-  accept="image/*,video/*"
-  multiple
-  capture="environment"
-  onChange={handleFileSelect} // ← use the new handler
-  className="sr-only"
-/>
-
-  {/* --- 2. Photo Previews & Management --- */}
-  {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
-    <div className="mt-4 border-t border-gray-200 pt-4">
-      <p className="text-sm font-medium text-gray-600 mb-2">
-        {photoFiles.length + uploadedPhotoUrls.length} File(s) Attached:
-      </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        
-        {/* Already Uploaded Photos (Read-only view) */}
-        {uploadedPhotoUrls.map((url, idx) => (
-          <div 
-            key={`uploaded-${idx}`} 
-            className="relative overflow-hidden group border border-gray-200 rounded-lg shadow-md"
-          >
-            <img 
-              src={url} 
-              alt={`uploaded-${idx}`} 
-              className="w-full h-24 object-cover transition-transform duration-300 group-hover:scale-105" 
-            />
-            {/* Optional: Add a subtle overlay for previously uploaded files */}
-            <div className="absolute inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
-                <span className="text-white text-xs font-bold bg-green-600 px-2 py-0.5 rounded">Uploaded</span>
-            </div>
-            {/* If you need a delete for uploaded, you'd add a button here, but typically this state is read-only */}
-          </div>
-        ))}
-
-        {/* Newly Selected Files (Pending Upload) */}
-        {/* Newly Selected Files (Pending Upload) */}
-{photoFiles.map((file, idx) => {
-  const isVideo = file.type.startsWith('video/');
-  const fileUrl = URL.createObjectURL(file);
-
-  return (
-    <div
-      key={`file-${idx}`}
-      className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
-      title={file.name}
-    >
-      {isVideo ? (
-        <div className="w-full h-24 bg-gray-800 flex items-center justify-center relative">
-          <video
-            src={fileUrl}
-            className="w-full h-full object-cover opacity-90"
-            muted
-            playsInline
-            poster="" // optional: add a poster later if needed
-          />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <Play className="w-6 h-6 text-white" /> {/* You'll need to import Play */}
-          </div>
-        </div>
-      ) : (
-        <img
-          src={fileUrl}
-          alt={`upload-${idx}`}
-          className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105"
-        />
-      )}
-
-      <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
-        {isVideo ? 'Video' : 'Image'}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          const newFiles = [...photoFiles];
-          newFiles.splice(idx, 1);
-          setPhotoFiles(newFiles);
-          URL.revokeObjectURL(fileUrl); // Clean up memory
-        }}
-        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700"
-        title="Remove file"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
-    </div>
-  );
-})}
-      </div>
-    </div>
-  )}
-</div>
-
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={isSubmitting}
-                  className={`w-full mb-3 py-3 px-6 text-blue-700 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition flex items-center justify-center ${
-                    isSubmitting ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                   Save Draft
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className={`w-full mt-4 py-3 px-6 text-white font-semibold rounded-xl transition flex items-center justify-center ${
-                    isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    "Submit Report"
+                  {/* RIGHT COLUMN: Started Activities Overview (When nothing selected) */}
+                  {!selectedActivity && startedActivities.length > 0 && (
+                     <div className="xl:col-span-1 space-y-6">
+                        <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                           <h2 className="text-lg font-semibold text-blue-700 border-b pb-2">Started Activities</h2>
+                           <div className="flex flex-col gap-4">
+                             {startedActivities.map((act, idx) => (
+                               <div
+                                 key={idx}
+                                 className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 hover:shadow-md transition cursor-pointer flex flex-col gap-2"
+                                 onClick={() => selectActivity(act)}
+                               >
+                                  <div className="flex justify-between items-start">
+                                     <span className="font-bold text-blue-600">{act.activity_id}</span>
+                                     <button 
+                                       onClick={(e) => { e.stopPropagation(); deleteActivity(e, act.activity_id); }}
+                                       className="p-1 rounded-full text-gray-400 hover:text-red-500 transition"
+                                     >
+                                       <X className="w-4 h-4" />
+                                     </button>
+                                  </div>
+                                  <div className="text-sm text-gray-500">{act.start_time}</div>
+                                  {act.damage_type && (
+                                    <div className="text-sm text-gray-700">
+                                      <span className="font-medium">Damage:</span> {act.damage_type}
+                                    </div>
+                                  )}
+                                   <button className="w-full mt-2 py-2 bg-blue-50 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-100 transition">
+                                      Resume
+                                   </button>
+                               </div>
+                             ))}
+                           </div>
+                        </div>
+                     </div>
                   )}
-                </button>
+
+                  {/* RIGHT COLUMN: Resources, Materials, Photos, Actions */}
+                  {selectedActivity && (
+                      <div className="xl:col-span-1 space-y-6">
+                          {/* Resources & Materials */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                              <h2 className="flex items-center text-xl font-semibold text-purple-700 border-b pb-2">
+                                <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
+                              </h2>
+                              <ListInput 
+                                label="Peralatan Digunakan / Equipment Used" 
+                                items={equipmentList} 
+                                setItems={setEquipmentList} 
+                                placeholder="Add equipment" 
+                                inputValue={equipmentInput}
+                                setInputValue={setEquipmentInput}
+                              />
+                              <ListInput 
+                                label="Tenaga Kerja / Manpower Involved" 
+                                items={manpowerList} 
+                                setItems={setManpowerList} 
+                                placeholder="Add manpower" 
+                                inputValue={manpowerInput}
+                                setInputValue={setManpowerInput}
+                              />
+                          </div>
+
+                          {/* Material Quantities */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                               <h2 className="flex items-center text-xl font-semibold text-blue-600 border-b pb-2">
+                                   <Briefcase className="w-5 h-5 mr-2" /> Materials Quantities
+                               </h2>
+                               <div className="grid grid-cols-1 gap-4">
+                                     <DimensionInput label="Excavation (m³)" value={excavation} onChange={setExcavation} />
+                                     <DimensionInput label="Sand (m³)" value={sand} onChange={setSand} />
+                                     <DimensionInput label="Aggregate (m³)" value={aggregate} onChange={setAggregate} />
+                                     <DimensionInput label="Premix (kg)" value={premix} onChange={setPremix} showDepth={false} />
+                                     <DimensionInput label="Cement (kg)" value={cement} onChange={setCement} showDepth={false} />
+                               </div>
+                               
+                               <div className="pt-4 border-t border-gray-100 space-y-4">
+                                  <FormInput
+                                      label="Pipe Usage (m)"
+                                      placeholder="e.g. 5"
+                                      type="number"
+                                      value={pipeUsage}
+                                      onChange={(e) => setPipeUsage(e.target.value)}
+                                  />
+                                  <ListInput
+                                      label="Fittings"
+                                      items={fittings}
+                                      setItems={setFittings}
+                                      placeholder="Add fitting"
+                                      inputValue={fittingsInput}
+                                      setInputValue={setFittingsInput}
+                                  />
+                                  <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                               </div>
+                          </div>
+
+                          {/* Photos */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                              <h2 className="flex items-center text-xl font-semibold text-gray-800 border-b pb-2">
+                                  <Camera className="w-5 h-5 mr-2"/> Attach Photos & Evidence
+                              </h2>
+                               <label htmlFor="file-upload" className="block cursor-pointer">
+                                  <div className="flex items-center justify-center h-24 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                                    <div className="flex flex-col items-center space-y-2 text-center">
+                                      <Camera className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
+                                      <span className="text-sm font-semibold text-blue-600">Tap to upload images/video</span>
+                                    </div>
+                                  </div>
+                                </label>
+                                 <input id="file-upload" type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleFileSelect} className="sr-only"/>
+                                 
+                                {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
+                                  <div className="grid grid-cols-3 gap-2">
+                                      {uploadedPhotoUrls.map((url, idx) => (
+                                         <div key={`url-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                                            <img src={url} className="w-full h-full object-cover" />
+                                         </div>
+                                      ))}
+                                      {photoFiles.map((file, idx) => (
+                                          <div key={`file-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 5)}...</div>
+                                               <button onClick={() => {
+                                                  const newFiles = [...photoFiles];
+                                                  newFiles.splice(idx, 1);
+                                                  setPhotoFiles(newFiles);
+                                               }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                                  <X className="w-3 h-3" />
+                                               </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                                )}
+                          </div>
+                          
+                          {/* Actions */}
+                           <div className="flex flex-col gap-3">
+                                <button
+                                  onClick={handleSaveDraft}
+                                  disabled={isSubmitting}
+                                  className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                                >
+                                   Save Draft
+                                </button>
+                                <button
+                                  onClick={handleSubmit}
+                                  disabled={isSubmitting}
+                                  className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                                    isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                                  }`}
+                                >
+                                  {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                                  {isSubmitting ? "Submitting..." : "Submit Report"}
+                                </button>
+                           </div>
+                      </div>
+                  )}
               </div>
-            </div>
-          )}
+           )}
+
+           {/* MAINTENANCE TAB - Form for 19 categories */}
+           {selectedActivity && activeTab === 'Maintenance' && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down">
+                  {MAINTENANCE_CATEGORIES.map((cat) => {
+                    const photos = maintenancePhotos[cat.key];
+                    return (
+                      <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                        <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
+                        <label htmlFor={`maintenance-upload-${cat.key}`} className="block cursor-pointer">
+                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-1 text-center">
+                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                            </div>
+                          </div>
+                        </label>
+                        <input id={`maintenance-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleMaintenanceFileSelect(cat.key)} className="sr-only"/>
+                        {(photos.files.length > 0 || photos.urls.length > 0) && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {photos.urls.map((url, idx) => (
+                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                                <img src={url} className="w-full h-full object-cover" />
+                                <button onClick={() => {
+                                  setMaintenancePhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      urls: prev[cat.key].urls.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {photos.files.map((file, idx) => (
+                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                                <button onClick={() => {
+                                  setMaintenancePhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Actions for Maintenance Tab */}
+                <div className="flex flex-col gap-3 mt-8">
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                  >
+                     Save Draft
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                      isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                    {isSubmitting ? "Submitting..." : "Submit Report"}
+                  </button>
+                </div>
+              </>
+           )}
+
+           {/* PREMIX TAB - Form for 11 categories */}
+           {selectedActivity && activeTab === 'Premix' && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down">
+                  {PREMIX_CATEGORIES.map((cat) => {
+                    const photos = premixPhotos[cat.key];
+                    return (
+                      <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
+                        <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
+                        <label htmlFor={`premix-upload-${cat.key}`} className="block cursor-pointer">
+                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-1 text-center">
+                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                            </div>
+                          </div>
+                        </label>
+                        <input id={`premix-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handlePremixFileSelect(cat.key)} className="sr-only"/>
+                        {(photos.files.length > 0 || photos.urls.length > 0) && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {photos.urls.map((url, idx) => (
+                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                                <img src={url} className="w-full h-full object-cover" />
+                                <button onClick={() => {
+                                  setPremixPhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      urls: prev[cat.key].urls.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {photos.files.map((file, idx) => (
+                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                                <button onClick={() => {
+                                  setPremixPhotos(prev => ({
+                                    ...prev,
+                                    [cat.key]: {
+                                      ...prev[cat.key],
+                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
+                                    }
+                                  }));
+                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Actions for Premix Tab */}
+                <div className="flex flex-col gap-3 mt-8">
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                  >
+                     Save Draft
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                      isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                    {isSubmitting ? "Submitting..." : "Submit Report"}
+                  </button>
+                </div>
+              </>
+           )}
+
+
+
         </div>
       </div>
       
