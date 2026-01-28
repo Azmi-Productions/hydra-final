@@ -11,6 +11,7 @@ import { Toaster } from "react-hot-toast";
 import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
 import LocationHistoryPage from "./pages/LocationHistory.tsx";
+import MaintenanceReport from "./pages/MaintenanceReport.tsx";
 
 function AppWrapper() {
   const location = useLocation();
@@ -102,6 +103,16 @@ function AppWrapper() {
             element={
               <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
                 <LiveDeviceMap />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Maintenance Report Printable View */}
+          <Route
+            path="/maintenance-report/:id?"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor"]}>
+                <MaintenanceReport />
               </ProtectedRoute>
             }
           />

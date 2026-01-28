@@ -1,8 +1,9 @@
 import { useState, ChangeEvent, useEffect } from "react";
 import toast from "../utils/toast";
-import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
+import { MapPin, Calendar, Briefcase, Camera, X, Loader2, ArrowLeft } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
+import { MaintenanceReportTemplate } from './MaintenanceReport';
 //old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -207,6 +208,7 @@ export default function ReportSubmissionPage() {
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
 
   const username = getCookie("username") || "Unknown";
 
@@ -911,275 +913,231 @@ const handleSubmit = async () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="space-y-8 lg:col-span-2">
-            <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-              <h2 className="flex items-center text-xl font-semibold text-blue-700 border-b pb-2">
-                <MapPin className="w-5 h-5 mr-2" /> Activity & Location Details
-              </h2>
-              <FormInput label="Activity ID" placeholder="Enter Activity ID" value={activityId} onChange={(e) => setActivityId(e.target.value)} />
-              <div className="space-y-4">
-                <div className="hidden">
-  <FormInput label="Latitude" placeholder="Latitude" value={latitude ?? ""} readOnly />
-  <FormInput label="Longitude" placeholder="Longitude" value={longitude ?? ""} readOnly />
-  <FormInput label="Google Maps Link" placeholder="Link" value={gmapLink ?? ""} readOnly />
-</div>
-
-                
-                {!selectedActivity && (
-                  <button
-                    onClick={startActivity}
-                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl"
-                    disabled={isOngoing}
-                  >
-                    Start Activity
-                  </button>
-                )}
-              </div>
-            </div>
-            
-
-
-
-            {selectedActivity && (
-              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-                <h2 className="flex items-center text-xl font-semibold text-green-700 border-b pb-2">
-                  <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
-                  <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
-                  <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
-                  <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
-                </div>
-                <hr className="border-gray-100 pt-3" />
-                <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
-              </div>
-            )}
+        {/* Tabs moved to top, outside the grid */}
+        {selectedActivity && (
+          <div className="flex bg-white/50 p-1.5 rounded-2xl mb-8 backdrop-blur-sm border border-gray-200 shadow-sm max-w-2xl mx-auto">
+            {(['Report', 'Maintenance', 'Premix'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
+        )}
 
-          {selectedActivity && (
-            <div className="space-y-8 lg:col-span-1">
-              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
-                <h2 className="flex items-center text-xl font-semibold text-purple-700 border-b pb-2">
-                  <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
-                </h2>
 
-                <ListInput 
-                  label="Peralatan Digunakan / Equipment Used" 
-                  items={equipmentList} 
-                  setItems={setEquipmentList} 
-                  placeholder="Add equipment" 
-                  inputValue={equipmentInput}
-                  setInputValue={setEquipmentInput}
-                />
-                <ListInput 
-                  label="Tenaga Kerja / Manpower Involved" 
-                  items={manpowerList} 
-                  setItems={setManpowerList} 
-                  placeholder="Add manpower" 
-                  inputValue={manpowerInput}
-                  setInputValue={setManpowerInput}
-                />
-                {/* Materials */}
-            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-4 mt-8 flex items-center">
-               <Briefcase className="w-5 h-5 mr-2 text-blue-600" />
-               Materials Quantities
-            </h3>
+        {/* Unified Content Area */}
+        <div className={`transition-all duration-300 ${activeTab === 'Maintenance' ? 'max-w-5xl mx-auto' : 'max-w-7xl mx-auto'}`}> 
 
-            <div className="space-y-4">
-               <DimensionInput
-                  label="Excavation (m³)"
-                  value={excavation}
-                  onChange={setExcavation}
-               />
-               <DimensionInput
-                  label="Sand (m³)"
-                  value={sand}
-                  onChange={setSand}
-               />
-               <DimensionInput
-                  label="Aggregate (m³)"
-                  value={aggregate}
-                  onChange={setAggregate}
-               />
-                <DimensionInput
-                  label="Premix (kg)"
-                  value={premix}
-                  onChange={setPremix}
-                  showDepth={false}
-               />
-               <DimensionInput
-                  label="Cement (kg)"
-                  value={cement}
-                  onChange={setCement}
-                  showDepth={false}
-               />
-               <FormInput
-                label="Pipe Usage (m)"
-                placeholder="e.g. 5"
-                type="number"
-                value={pipeUsage}
-                onChange={(e) => setPipeUsage(e.target.value)}
-              />
-              <ListInput
-                label="Fittings"
-                items={fittings}
-                setItems={setFittings}
-                placeholder="Add fitting"
-                inputValue={fittingsInput}
-                setInputValue={setFittingsInput}
-              />
-            </div>
-            <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
 
-                {/* Photo Upload */}
-                <div className="mt-4">
-  <label className="text-base font-semibold text-gray-800 mb-2 block">
-    📸 Attach Photos & Evidence
-  </label>
-  
-  {/* --- 1. Custom File Input / Dropzone --- */}
-  <label htmlFor="file-upload" className="block cursor-pointer mb-4">
-    <div className="flex items-center justify-center h-20 border-2 border-dashed border-indigo-400 rounded-xl p-4 bg-indigo-50/70 hover:bg-indigo-100 transition-all duration-200 group">
-      <div className="flex items-center space-x-3 text-center">
-        <Camera className="w-5 h-5 text-indigo-600 group-hover:text-indigo-700 transition-colors" />
-        <p className="text-sm font-semibold text-indigo-700">
-          Tap here to select images
-        </p>
-        <p className="text-xs text-gray-500 hidden sm:block">
-          (Multiple files | Accepts image/*)
-        </p>
-      </div>
-    </div>
-  </label>
+           {/* --- TAB CONTENT --- */}
+           
+           {/* REPORT TAB or (!selectedActivity to show ID input) */}
+           {(!selectedActivity || activeTab === 'Report') && (
+           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-slide-down">
+                  
+                  {/* LEFT COLUMN: Activity & Timing */}
+                  <div className="xl:col-span-2 space-y-6">
+                      {/* Activity & Location Details */}
+                      <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                          <h2 className="flex items-center text-xl font-semibold text-blue-700 border-b pb-2">
+                            <MapPin className="w-5 h-5 mr-2" /> Activity & Location Details
+                          </h2>
+                          <FormInput label="Activity ID" placeholder="Enter Activity ID" value={activityId} onChange={(e) => setActivityId(e.target.value)} />
+                          
+                          {!selectedActivity && (
+                            <button
+                              onClick={startActivity}
+                              className="mt-2 px-6 py-3 bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition font-semibold"
+                              disabled={isOngoing}
+                            >
+                              Start Activity
+                            </button>
+                          )}
+                      </div>
 
-  {/* Hidden native input */}
- <input
-  id="file-upload"
-  type="file"
-  accept="image/*,video/*"
-  multiple
-  capture="environment"
-  onChange={handleFileSelect} // ← use the new handler
-  className="sr-only"
-/>
+                      {/* Timing & Outcome (Only show if selected) */}
+                      {selectedActivity && (
+                        <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                          <h2 className="flex items-center text-xl font-semibold text-green-700 border-b pb-2">
+                            <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
+                          </h2>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                            <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
+                            <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
+                            <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
+                          </div>
+                          <hr className="border-gray-100 pt-3" />
+                          <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+                        </div>
+                      )}
+                  </div>
 
-  {/* --- 2. Photo Previews & Management --- */}
-  {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
-    <div className="mt-4 border-t border-gray-200 pt-4">
-      <p className="text-sm font-medium text-gray-600 mb-2">
-        {photoFiles.length + uploadedPhotoUrls.length} File(s) Attached:
-      </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        
-        {/* Already Uploaded Photos (Read-only view) */}
-        {uploadedPhotoUrls.map((url, idx) => (
-          <div 
-            key={`uploaded-${idx}`} 
-            className="relative overflow-hidden group border border-gray-200 rounded-lg shadow-md"
-          >
-            <img 
-              src={url} 
-              alt={`uploaded-${idx}`} 
-              className="w-full h-24 object-cover transition-transform duration-300 group-hover:scale-105" 
-            />
-            {/* Optional: Add a subtle overlay for previously uploaded files */}
-            <div className="absolute inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
-                <span className="text-white text-xs font-bold bg-green-600 px-2 py-0.5 rounded">Uploaded</span>
-            </div>
-            {/* If you need a delete for uploaded, you'd add a button here, but typically this state is read-only */}
-          </div>
-        ))}
+                  {/* RIGHT COLUMN: Resources, Materials, Photos, Actions */}
+                  {selectedActivity && (
+                      <div className="xl:col-span-1 space-y-6">
+                          {/* Resources & Materials */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                              <h2 className="flex items-center text-xl font-semibold text-purple-700 border-b pb-2">
+                                <Briefcase className="w-5 h-5 mr-2" /> Resources & Materials
+                              </h2>
+                              <ListInput 
+                                label="Peralatan Digunakan / Equipment Used" 
+                                items={equipmentList} 
+                                setItems={setEquipmentList} 
+                                placeholder="Add equipment" 
+                                inputValue={equipmentInput}
+                                setInputValue={setEquipmentInput}
+                              />
+                              <ListInput 
+                                label="Tenaga Kerja / Manpower Involved" 
+                                items={manpowerList} 
+                                setItems={setManpowerList} 
+                                placeholder="Add manpower" 
+                                inputValue={manpowerInput}
+                                setInputValue={setManpowerInput}
+                              />
+                          </div>
 
-        {/* Newly Selected Files (Pending Upload) */}
-        {/* Newly Selected Files (Pending Upload) */}
-{photoFiles.map((file, idx) => {
-  const isVideo = file.type.startsWith('video/');
-  const fileUrl = URL.createObjectURL(file);
+                          {/* Material Quantities */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                               <h2 className="flex items-center text-xl font-semibold text-blue-600 border-b pb-2">
+                                   <Briefcase className="w-5 h-5 mr-2" /> Materials Quantities
+                               </h2>
+                               <div className="grid grid-cols-1 gap-4">
+                                     <DimensionInput label="Excavation (m³)" value={excavation} onChange={setExcavation} />
+                                     <DimensionInput label="Sand (m³)" value={sand} onChange={setSand} />
+                                     <DimensionInput label="Aggregate (m³)" value={aggregate} onChange={setAggregate} />
+                                     <DimensionInput label="Premix (kg)" value={premix} onChange={setPremix} showDepth={false} />
+                                     <DimensionInput label="Cement (kg)" value={cement} onChange={setCement} showDepth={false} />
+                               </div>
+                               
+                               <div className="pt-4 border-t border-gray-100 space-y-4">
+                                  <FormInput
+                                      label="Pipe Usage (m)"
+                                      placeholder="e.g. 5"
+                                      type="number"
+                                      value={pipeUsage}
+                                      onChange={(e) => setPipeUsage(e.target.value)}
+                                  />
+                                  <ListInput
+                                      label="Fittings"
+                                      items={fittings}
+                                      setItems={setFittings}
+                                      placeholder="Add fitting"
+                                      inputValue={fittingsInput}
+                                      setInputValue={setFittingsInput}
+                                  />
+                                  <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                               </div>
+                          </div>
 
-  return (
-    <div
-      key={`file-${idx}`}
-      className="relative overflow-hidden group border-2 border-indigo-400 rounded-lg shadow-lg"
-      title={file.name}
-    >
-      {isVideo ? (
-        <div className="w-full h-24 bg-gray-800 flex items-center justify-center relative">
-          <video
-            src={fileUrl}
-            className="w-full h-full object-cover opacity-90"
-            muted
-            playsInline
-            poster="" // optional: add a poster later if needed
-          />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <Play className="w-6 h-6 text-white" /> {/* You'll need to import Play */}
-          </div>
-        </div>
-      ) : (
-        <img
-          src={fileUrl}
-          alt={`upload-${idx}`}
-          className="w-full h-24 object-cover opacity-80 transition-transform duration-300 group-hover:scale-105"
-        />
-      )}
-
-      <div className="absolute top-0 left-0 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-br-lg">
-        {isVideo ? 'Video' : 'Image'}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          const newFiles = [...photoFiles];
-          newFiles.splice(idx, 1);
-          setPhotoFiles(newFiles);
-          URL.revokeObjectURL(fileUrl); // Clean up memory
-        }}
-        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1.5 shadow-md transition-all duration-200 opacity-90 hover:opacity-100 hover:bg-red-700"
-        title="Remove file"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
-    </div>
-  );
-})}
-      </div>
-    </div>
-  )}
-</div>
-
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={isSubmitting}
-                  className={`w-full mb-3 py-3 px-6 text-blue-700 font-semibold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition flex items-center justify-center ${
-                    isSubmitting ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                >
-                   Save Draft
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className={`w-full mt-4 py-3 px-6 text-white font-semibold rounded-xl transition flex items-center justify-center ${
-                    isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    "Submit Report"
+                          {/* Photos */}
+                          <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-6">
+                              <h2 className="flex items-center text-xl font-semibold text-gray-800 border-b pb-2">
+                                  <Camera className="w-5 h-5 mr-2"/> Attach Photos & Evidence
+                              </h2>
+                               <label htmlFor="file-upload" className="block cursor-pointer">
+                                  <div className="flex items-center justify-center h-24 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                                    <div className="flex flex-col items-center space-y-2 text-center">
+                                      <Camera className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
+                                      <span className="text-sm font-semibold text-blue-600">Tap to upload images/video</span>
+                                    </div>
+                                  </div>
+                                </label>
+                                 <input id="file-upload" type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleFileSelect} className="sr-only"/>
+                                 
+                                {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
+                                  <div className="grid grid-cols-3 gap-2">
+                                      {uploadedPhotoUrls.map((url, idx) => (
+                                         <div key={`url-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-gray-200 group">
+                                            <img src={url} className="w-full h-full object-cover" />
+                                         </div>
+                                      ))}
+                                      {photoFiles.map((file, idx) => (
+                                          <div key={`file-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+                                              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 5)}...</div>
+                                               <button onClick={() => {
+                                                  const newFiles = [...photoFiles];
+                                                  newFiles.splice(idx, 1);
+                                                  setPhotoFiles(newFiles);
+                                               }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                                                  <X className="w-3 h-3" />
+                                               </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                                )}
+                          </div>
+                          
+                          {/* Actions */}
+                           <div className="flex flex-col gap-3">
+                                <button
+                                  onClick={handleSaveDraft}
+                                  disabled={isSubmitting}
+                                  className={`w-full py-3 text-blue-700 font-bold rounded-xl border-2 border-blue-600 hover:bg-blue-50 transition ${isSubmitting ? "opacity-50" : ""}`}
+                                >
+                                   Save Draft
+                                </button>
+                                <button
+                                  onClick={handleSubmit}
+                                  disabled={isSubmitting}
+                                  className={`w-full py-3 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center ${
+                                    isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+                                  }`}
+                                >
+                                  {isSubmitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                                  {isSubmitting ? "Submitting..." : "Submit Report"}
+                                </button>
+                           </div>
+                      </div>
                   )}
-                </button>
               </div>
-            </div>
-          )}
+           )}
+
+           {/* MAINTENANCE TAB - Live Report Preview */}
+           {selectedActivity && activeTab === 'Maintenance' && (
+              <div className="bg-gray-200 shadow-inner rounded-3xl p-6 border border-gray-300 animate-slide-down flex justify-center overflow-x-auto">
+                   <div style={{ transform: 'scale(0.8)', transformOrigin: 'top center' }}>
+                        <MaintenanceReportTemplate 
+                            data={{
+                                id: 0, // Temporary ID
+                                activity_id: activityId || "N/A",
+                                date: date || "",
+                                start_time: startTime || "",
+                                end_time: endTime || "In Progress",
+                                address: remarks || "No Address Provided", // Using Remarks as address for now
+                                // Combine uploaded URLs and local file previews
+                                photos: [
+                                    ...uploadedPhotoUrls,
+                                    ...photoFiles.map(f => URL.createObjectURL(f))
+                                ]
+                            }}
+                        />
+                   </div>
+              </div>
+           )}
+
+           {/* PREMIX TAB - Empty for now */}
+           {selectedActivity && activeTab === 'Premix' && (
+              <div className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 animate-slide-down min-h-[300px] flex items-center justify-center text-gray-400">
+                 <p className="italic">Premix content will be moved here in future.</p>
+              </div>
+           )}
+
+
+
         </div>
       </div>
       
