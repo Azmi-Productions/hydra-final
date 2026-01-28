@@ -275,7 +275,7 @@ export default function ReportSubmissionPage() {
   }, [date]);
 const MAX_VIDEO_SIZE_MB = 15;
 const MAX_IMAGE_SIZE_MB_BEFORE_COMPRESSION = 20; // optional safety net
-const MAX_TOTAL_FILES = 5;
+{/*}const MAX_TOTAL_FILES = 5;
 
 const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = e.target.files;
@@ -311,7 +311,7 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
   // Add valid files
   setPhotoFiles(prev => [...prev, ...newValidFiles]);
-};
+};*/}
 
 const handleMaintenanceFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = e.target.files;
