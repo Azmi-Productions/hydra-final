@@ -3,7 +3,7 @@ import toast from "../utils/toast";
 import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
-
+//old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
