@@ -583,7 +583,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
           </p>
 
-         {/* Original Media Attachments */}
+         {/* Original Media Attachments 
          {editableReport.photo_link && editableReport.photo_link.length > 0 && (
   <section className="space-y-4 pt-4">
     <h3 className={sectionHeaderStyle}>
@@ -591,46 +591,26 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     </h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       {editableReport.photo_link.map((url, idx) => {
-        const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
-        return (
-          <a
-            key={idx}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block group"
-          >
-            {isVideo ? (
-                          <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
-                            <video
-                              src={url}
-                              className="w-full h-full object-cover"
-                              muted
-                              playsInline
-                              preload="metadata"
-                            />
-                            {/* Optional: Play overlay on hover */}
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Play className="w-6 h-6 text-white" />
-                            </div>
-                          </div>
-                        ) : (
-                          <img
-                            src={url}
-                            alt={`Attachment ${idx + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
-                            loading="lazy"
-                          />
-                        )}
-                      </a>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-           </div>
-        )}
+      const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+                  return (
+                    <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group">
+                      {isVideo ? (
+                        <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                          <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                        </div>
+                      ) : (
+                        <img src={url} alt={`Attachment ${idx + 1}`} className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition" loading="lazy" />
+                      )}
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
+          )} 
+          */}
 
+        </div> // This closes the <div className="space-y-8 animate-fade-in"> for the Report tab
+      )}
         {/* TAB CONTENT: MAINTENANCE */}
         {activeTab === 'Maintenance' && (
            <div className="space-y-6 animate-fade-in">
