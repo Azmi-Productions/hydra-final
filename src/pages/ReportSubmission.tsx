@@ -7,40 +7,40 @@ import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // Maintenance categories with English/Malay labels
 const MAINTENANCE_CATEGORIES = [
-  { key: 'wakil_syabas', label: 'Representative at Site / wakil syabas di tapak' },
-  { key: 'penyediaan_peralatan', label: 'Safety Equipment Preparation / penyediaan peralatan keselamatan' },
-  { key: 'lokasi_kebocoran', label: 'Leak Location / lokasi kebocoran' },
-  { key: 'pemotongan_jalan', label: 'Road Cutting Works / kerja-kerja pemotongan jalan' },
-  { key: 'pengorekan', label: 'Excavation Works / kerja-kerja pengorekan' },
-  { key: 'pembaikan1', label: 'Repair Works / kerja-kerja pembaikan' },
-  { key: 'barangan_rosak', label: 'Damaged/Old Items / barangan rosak/lama' },
-  { key: 'barangan_ganti', label: 'Items to be Replaced / barangan yang akan diganti' },
-  { key: 'masukkan_pasir', label: 'Sand Filling Works / kerja memasukkan pasir' },
-  { key: 'mampatan_pasir', label: 'First Layer Sand Compaction Works / kerja-kerja mampatan pasir lapisan pertama' },
-  { key: 'mampatan_batu', label: 'Aggregate Compaction Works / kerja-kerja mampatan batu pecah' },
-  { key: 'pembaikan2', label: 'Repair Works / kerja-kerja pembaikan' },
-  { key: 'siap_sepenuhnya', label: 'Work Fully Completed / kerja telah siap sepenuhnya' },
-  { key: 'gambar_papan_putih', label: 'Whiteboard Picture / Gambar papan putih' },
-  { key: 'gambar_pengesahan', label: 'Site Confirmation Picture / gambar pengesahan tapak' },
-  { key: 'gambar_point_bocor_pembaikan', label: 'Leak Point Picture for Repair Work / Gambar point bocor untuk kerja pembaikan' },
-  { key: 'gambar_point_bocor_sudah', label: 'Leak Point Picture After Repair / gambar point bocor yang telah pembaikan' },
-  { key: 'gambar_barang_lama', label: 'Picture of Old Damaged Items / gambara barang lama yang telah rosak' },
-  { key: 'gambar_barang_baru', label: 'Picture of New Replaced Items / gambar barang baru yang telah ditukar' },
+  { key: 'wakil_syabas', label: 'Wakil Syabas di tapak / Representative at Site' },
+  { key: 'penyediaan_peralatan', label: 'Penyediaan peralatan keselamatan / Safety Equipment Preparation' },
+  { key: 'lokasi_kebocoran', label: 'Lokasi Kebocoran / Leak Location' },
+  { key: 'pemotongan_jalan', label: 'Kerja-kerja Pemotongan Jalan / Road Cutting Works' },
+  { key: 'pengorekan', label: 'Kerja-kerja Pengorekan / Excavation Works' },
+  { key: 'pembaikan1', label: 'Kerja-kerja Pembaikan / Repair Works' },
+  { key: 'barangan_rosak', label: 'Barangan yang telah rosak/lama / Damaged/Old Items' },
+  { key: 'barangan_ganti', label: 'Barangan yang akan diganti / Items to be Replaced' },
+  { key: 'masukkan_pasir', label: 'Kerja memasukkan pasir / Sand Filling Works' },
+  { key: 'mampatan_pasir', label: 'Kerja-kerja mampatan pasir lapisan pertama / First Layer Sand Compaction Works' },
+  { key: 'mampatan_batu', label: 'Kerja-kerja mampatan batu pecah / Aggregate Compaction Works' },
+  { key: 'pembaikan2', label: 'Kerja-kerja Pembaikan / Repair Works' },
+  { key: 'siap_sepenuhnya', label: 'Kerja telah siap sepenuhnya / Work Fully Completed' },
+  { key: 'gambar_papan_putih', label: 'Gambar Papan Putih / Whiteboard Picture' },
+  { key: 'gambar_pengesahan', label: 'Gambar Pengesahan Tapak / Site Confirmation Picture' },
+  { key: 'gambar_point_bocor_pembaikan', label: 'Gambar Point Bocor untuk Kerja Pembaikan / Leak Point Picture for Repair Work' },
+  { key: 'gambar_point_bocor_sudah', label: 'Gambar Point Bocor yang telah Pembaikan / Leak Point Picture After Repair' },
+  { key: 'gambar_barang_lama', label: 'Gambar Barang Lama yang telah rosak / Picture of Old Damaged Items' },
+  { key: 'gambar_barang_baru', label: 'Gambar Barang Baru yang telah ditukar / Picture of New Replaced Items' },
 ];
 
 // Premix categories with English/Malay labels
 const PREMIX_CATEGORIES = [
-  { key: 'kedalaman_keseluruhan', label: 'Overall Depth Picture / gambar kedalaman keseluruhan' },
-  { key: 'kedalaman_premix_kedua', label: 'Second Layer Premix Depth Picture / gambar kedalaman premix lapisan kedua' },
-  { key: 'tack_coat_pertama', label: 'First Layer Tack Coat Placement Picture / Gambar meletakkan tack coat lapisan pertama' },
-  { key: 'mampatan_premix_pertama', label: 'First Layer Premix Compaction Works / kerja-kerja mampatan premix lapisan pertama' },
-  { key: 'tack_coat_kedua', label: 'Second Layer Tack Coat Placement Picture / gambar meletakkan tack coat lapisan kedua' },
-  { key: 'mampatan_premix_kedua', label: 'Second Layer Premix Compaction Works / kerja-kerja mampatan premix lapisan kedua' },
-  { key: 'keluasan_turapan', label: 'Pavement Area Picture / gambar keluasan turapan' },
-  { key: 'kerja_turapan_siap', label: 'Finished Pavement Work Picture / gambar kerja turapan siap' },
-  { key: 'pengesahan_tapak', label: 'Site Confirmation Picture / gambar pengesahan tapak' },
-  { key: 'ukuran_premix', label: 'Premix Size Picture / gambar ukuran premix' },
-  { key: 'label_premix', label: 'Premix Label Picture / gambar label premix' },
+  { key: 'kedalaman_keseluruhan', label: 'Gambar Kedalaman Keseluruhan / Overall Depth Picture' },
+  { key: 'kedalaman_premix_kedua', label: 'Gambar Kedalaman Premix Lapisan Kedua / Second Layer Premix Depth Picture' },
+  { key: 'tack_coat_pertama', label: 'Gambar Meletakkan Tack Coat Lapisan Pertama / First Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_pertama', label: 'Kerja-kerja Mampatan Premix Lapisan Pertama / First Layer Premix Compaction Works' },
+  { key: 'tack_coat_kedua', label: 'Gambar Meletakkan Tack Coat Lapisan Kedua / Second Layer Tack Coat Placement Picture' },
+  { key: 'mampatan_premix_kedua', label: 'Kerja-kerja Mampatan Premix Lapisan Kedua / Second Layer Premix Compaction Works' },
+  { key: 'keluasan_turapan', label: 'Gambar Keluasan Turapan / Pavement Area Picture' },
+  { key: 'kerja_turapan_siap', label: 'Gambar Kerja Turapan Siap / Finished Pavement Work Picture' },
+  { key: 'pengesahan_tapak', label: 'Gambar Pengesahan Tapak / Site Confirmation Picture' },
+  { key: 'ukuran_premix', label: 'Gambar Ukuran Premix / Premix Size Picture' },
+  { key: 'label_premix', label: 'Gambar Label Premix / Premix Label Picture' },
 ];
 //old hydra
 // --- Supabase REST API ---
@@ -430,20 +430,17 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
         setSelectedActivity(null);
         setPhotoFiles([]);
         setUploadedPhotoUrls([]);
-        setMaintenancePhotos(() => {
-          const initial: Record<string, {files: File[], urls: string[]}> = {};
-          MAINTENANCE_CATEGORIES.forEach(cat => {
-            initial[cat.key] = {files: [], urls: []};
-          });
-          return initial;
+        const initialMaintenance: Record<string, {files: File[], urls: string[]}> = {};
+        MAINTENANCE_CATEGORIES.forEach((cat) => {
+          initialMaintenance[cat.key] = {files: [], urls: []};
         });
-        setPremixPhotos(() => {
-          const initial: Record<string, {files: File[], urls: string[]}> = {};
-          PREMIX_CATEGORIES.forEach(cat => {
-            initial[cat.key] = {files: [], urls: []};
-          });
-          return initial;
+        setMaintenancePhotos(initialMaintenance);
+        
+        const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+        PREMIX_CATEGORIES.forEach((cat) => {
+          initialPremix[cat.key] = {files: [], urls: []};
         });
+        setPremixPhotos(initialPremix);
       }
       
       fetchStartedActivities();
@@ -857,20 +854,17 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
     }
 
     // Clear local files
-    setMaintenancePhotos(prev => {
-      const newState: Record<string, {files: File[], urls: string[]}> = {};
-      MAINTENANCE_CATEGORIES.forEach(cat => {
-        newState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
-      });
-      return newState;
+    const maintenanceState: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach((cat) => {
+      maintenanceState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
     });
-    setPremixPhotos(prev => {
-      const newState: Record<string, {files: File[], urls: string[]}> = {};
-      PREMIX_CATEGORIES.forEach(cat => {
-        newState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
-      });
-      return newState;
+    setMaintenancePhotos(maintenanceState);
+
+    const premixState: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach((cat) => {
+      premixState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
     });
+    setPremixPhotos(premixState);
 
     // Set photo_link as JSON string wrapped in array for text[] column
     const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
@@ -925,13 +919,11 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
       setSelectedActivity(null);
       setPhotoFiles([]);
       setUploadedPhotoUrls([]);
-      setPremixPhotos(() => {
-        const initial: Record<string, {files: File[], urls: string[]}> = {};
-        PREMIX_CATEGORIES.forEach(cat => {
-          initial[cat.key] = {files: [], urls: []};
-        });
-        return initial;
+      const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+      PREMIX_CATEGORIES.forEach((cat) => {
+        initialPremix[cat.key] = {files: [], urls: []};
       });
+      setPremixPhotos(initialPremix);
 
       fetchStartedActivities();
       
@@ -1083,20 +1075,17 @@ const handleSubmit = async () => {
     }
 
     // Clear local files
-    setMaintenancePhotos(prev => {
-      const newState: Record<string, {files: File[], urls: string[]}> = {};
-      MAINTENANCE_CATEGORIES.forEach(cat => {
-        newState[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
-      });
-      return newState;
+    const maintenanceStateSubmit: Record<string, {files: File[], urls: string[]}> = {};
+    MAINTENANCE_CATEGORIES.forEach((cat) => {
+      maintenanceStateSubmit[cat.key] = {files: [], urls: maintenancePhotoUrls[cat.key]};
     });
-    setPremixPhotos(prev => {
-      const newState: Record<string, {files: File[], urls: string[]}> = {};
-      PREMIX_CATEGORIES.forEach(cat => {
-        newState[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
-      });
-      return newState;
+    setMaintenancePhotos(maintenanceStateSubmit);
+
+    const premixStateSubmit: Record<string, {files: File[], urls: string[]}> = {};
+    PREMIX_CATEGORIES.forEach((cat) => {
+      premixStateSubmit[cat.key] = {files: [], urls: premixPhotoUrls[cat.key]};
     });
+    setPremixPhotos(premixStateSubmit);
     // Set photo_link as JSON string
     const photoData = { maintenance: maintenancePhotoUrls, premix: premixPhotoUrls };
     const photoLinkData = JSON.stringify(photoData);
@@ -1236,20 +1225,17 @@ const handleSubmit = async () => {
                   setSelectedActivity(null);
                   setPhotoFiles([]);
                   setUploadedPhotoUrls([]);
-                  setMaintenancePhotos(() => {
-                    const initial: Record<string, {files: File[], urls: string[]}> = {};
-                    MAINTENANCE_CATEGORIES.forEach(cat => {
-                      initial[cat.key] = {files: [], urls: []};
-                    });
-                    return initial;
+                  const initialMaintenance: Record<string, {files: File[], urls: string[]}> = {};
+                  MAINTENANCE_CATEGORIES.forEach((cat) => {
+                    initialMaintenance[cat.key] = {files: [], urls: []};
                   });
-                  setPremixPhotos(() => {
-                    const initial: Record<string, {files: File[], urls: string[]}> = {};
-                    PREMIX_CATEGORIES.forEach(cat => {
-                      initial[cat.key] = {files: [], urls: []};
-                    });
-                    return initial;
+                  setMaintenancePhotos(initialMaintenance);
+                  
+                  const initialPremix: Record<string, {files: File[], urls: string[]}> = {};
+                  PREMIX_CATEGORIES.forEach((cat) => {
+                    initialPremix[cat.key] = {files: [], urls: []};
                   });
+                  setPremixPhotos(initialPremix);
                 }}
                 className="p-2 rounded-full hover:bg-gray-200 transition-colors"
                 title="Back to Activity List"
