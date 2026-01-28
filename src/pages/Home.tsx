@@ -36,6 +36,7 @@ interface Report {
   sand?: number | null;
   aggregate?: number | null;
   premix?: number | null;
+  cement?: number | null;
   pipe_usage?: number | null;
 
   fittings?: string | null;
@@ -163,6 +164,7 @@ export default function Dashboard() {
     { name: "Sand", value: reports.reduce((acc, r) => acc + (r.sand ?? 0), 0) },
     { name: "Aggregate", value: reports.reduce((acc, r) => acc + (r.aggregate ?? 0), 0) },
     { name: "Premix", value: reports.reduce((acc, r) => acc + (r.premix ?? 0), 0) },
+    { name: "Cement", value: reports.reduce((acc, r) => acc + (r.cement ?? 0), 0) },
     { name: "Pipe", value: reports.reduce((acc, r) => acc + (r.pipe_usage ?? 0), 0) },
   ];
 

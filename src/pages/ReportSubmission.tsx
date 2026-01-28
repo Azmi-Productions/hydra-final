@@ -100,18 +100,28 @@ interface ListInputProps {
 
 const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputValue }: ListInputProps) => {
 
-  const safeItems = Array.isArray(items) ? items : [];
+  const safeItems = Array.isArray(items) ? items.filter(item => item && item.trim()) : [];
 
   const addItem = () => {
-    if (!inputValue.trim()) return;
-    setItems([...safeItems, inputValue.trim()]);
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue === "") {
+      // Don't add empty items
+      return;
+    }
+    const newItems = [...items, trimmedValue];
+    setItems(newItems);
     setInputValue("");
   };
 
   const removeItem = (index: number) => {
-    const newItems = [...safeItems];
-    newItems.splice(index, 1);
-    setItems(newItems);
+    // Find the actual index in the original items array
+    const itemToRemove = safeItems[index];
+    const actualIndex = items.indexOf(itemToRemove);
+    if (actualIndex !== -1) {
+      const newItems = [...items];
+      newItems.splice(actualIndex, 1);
+      setItems(newItems);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -133,7 +143,16 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
         />
-        <button type="button" onClick={addItem} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={!inputValue.trim()}
+          className={`px-4 py-2 font-semibold rounded-xl transition ${
+            inputValue.trim()
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
           Add
         </button>
       </div>
@@ -168,13 +187,15 @@ export default function ReportSubmissionPage() {
   const [sand, setSand] = useState<Dimensions | null>(null);
   const [aggregate, setAggregate] = useState<Dimensions | null>(null);
   const [premix, setPremix] = useState<Dimensions | null>(null);
+  const [cement, setCement] = useState<Dimensions | null>(null);
   const [pipeUsage, setPipeUsage] = useState("");
-  const [fittings, setFittings] = useState("");
+  const [fittings, setFittings] = useState<string[]>([]);
   const [remarks, setRemarks] = useState("");
   
   // Pending inputs for lists
   const [equipmentInput, setEquipmentInput] = useState("");
   const [manpowerInput, setManpowerInput] = useState("");
+  const [fittingsInput, setFittingsInput] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [gmapLink, setGmapLink] = useState("");
@@ -191,8 +212,10 @@ export default function ReportSubmissionPage() {
 
   useEffect(() => {
     if (date) {
-      const d = new Date(date);
-      const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
+      // Parse date in YYYY-MM-DD format
+      const [year, month, dayPart] = date.split('-');
+      const parsedDate = new Date(`${year}-${month}-${dayPart}`);
+      const weekday = parsedDate.toLocaleDateString("en-US", { weekday: "long" });
       setDay(weekday);
     }
   }, [date]);
@@ -327,10 +350,12 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.error(e);
   }
 
+  // Use Malaysia time zone
   const now = new Date();
-  const timeStr = now.toTimeString().slice(0, 5);
-  const todayStr = now.toISOString().slice(0, 10);
-  const weekdayStr = now.toLocaleDateString("en-US", { weekday: "long" });
+  const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+  const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+  const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
+  const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
   setStartTime(timeStr);
   setDate(todayStr);
@@ -448,8 +473,22 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSand(parseDimensions(activity.sand));
     setAggregate(parseDimensions(activity.aggregate));
     setPremix(parseDimensions(activity.premix));
+    setCement(parseDimensions(activity.cement));
+
+    let fitList = activity.fittings;
+    if (typeof fitList === 'string') {
+        // Try to parse as JSON array first
+        try {
+            fitList = JSON.parse(fitList);
+        } catch(e) {
+            // If JSON parsing fails, treat as comma-separated string
+            fitList = fitList.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        }
+    }
+    // Filter out empty/whitespace-only strings regardless of source
+    setFittings(Array.isArray(fitList) ? fitList.filter((s: string) => s && s.trim()) : []);
+
     setPipeUsage(activity.pipe_usage || "");
-    setFittings(activity.fittings || "");
     setRemarks(activity.remarks || "");
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
@@ -514,22 +553,25 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
       // --- Calculate Duration for Draft (optional, but good to have current snapshot) ---
       const now = new Date();
-      const startDateTime = new Date(`${date}T${startTime}:00`);
+      const malaysiaNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+
+      // Date is already in YYYY-MM-DD format
+      const isoDateStr = date;
+      const startDateTime = new Date(`${isoDateStr}T${startTime}:00`);
 
       if (isNaN(startDateTime.getTime())) {
-        startDateTime.setTime(now.getTime()); 
+        startDateTime.setTime(malaysiaNow.getTime());
       }
-      if (now < startDateTime) {
+      if (malaysiaNow < startDateTime) {
         startDateTime.setDate(startDateTime.getDate() - 1);
       }
-      let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+      let diffHours = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
       if (isNaN(diffHours) || diffHours < 0.05) {
         diffHours = 0.05;
       }
       const finalDurationStr = diffHours.toFixed(2);
 
-      // --- Update location ---
-      getLocation(); // Try to update location for draft
+      // Do not update location for draft to avoid capturing end_time prematurely
 
       // Capture pending inputs for Equipment and Manpower
       const finalEquipmentList = [...equipmentList];
@@ -546,11 +588,12 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setManpowerInput("");
       }
 
-      const payload = {
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
+
+    const payload = {
         date,
         start_time: startTime,
-        // end_time: now.toTimeString().slice(0, 5), // Maybe don't set end_time for draft? Or set it? Let's update it as "current progress"
-        end_time: now.toTimeString().slice(0, 5),
+        // Do not set end_time for draft
         day,
         duration: finalDurationStr,
         damage_type: damageType,
@@ -560,12 +603,11 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         sand: sand || null,
         aggregate: aggregate || null,
         premix: premix || null,
+        cement: cement || null,
         pipe_usage: pipeUsage || null,
-        fittings,
+        fittings: finalFittingsList,
         remarks,
-        end_latitude: latitude,
-        end_longitude: longitude,
-        end_gmap_link: gmapLink,
+        // Do not update end location for draft
         photo_link: photoLinks,
         status: "Started", // IMPORTANT: Keep status as Started
       };
@@ -671,6 +713,8 @@ const handleSubmit = async () => {
 
     // --- FIXED DURATION LOGIC (Handles cross-day correctly) ---
     const now = new Date();
+    const malaysiaNow = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+
     // Validate date and startTime presence
     if (!date || !startTime) {
        console.error("Missing Date or StartTime", date, startTime);
@@ -679,20 +723,22 @@ const handleSubmit = async () => {
        return;
     }
 
-    const startDateTime = new Date(`${date}T${startTime}:00`);
+    // Date is already in YYYY-MM-DD format
+    const isoDateStr = date;
+    const startDateTime = new Date(`${isoDateStr}T${startTime}:00`);
 
     if (isNaN(startDateTime.getTime())) {
       console.error("Invalid Start Date/Time", date, startTime);
       // Fallback or error - deciding to set to now so duration is minimal
-      startDateTime.setTime(now.getTime()); 
+      startDateTime.setTime(malaysiaNow.getTime());
     }
 
     // If current time is earlier than start datetime → activity crossed to next day
-    if (now < startDateTime) {
+    if (malaysiaNow < startDateTime) {
       startDateTime.setDate(startDateTime.getDate() - 1);
     }
 
-    let diffHours = (now.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+    let diffHours = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
 
     // Enforce minimum duration of 0.05 hours (3 mins)
     if (isNaN(diffHours) || diffHours < 0.05) {
@@ -701,7 +747,8 @@ const handleSubmit = async () => {
 
     const finalDurationStr = diffHours.toFixed(2);
 
-    setEndTime(now.toTimeString().slice(0, 5));
+    const malaysiaEndTime = malaysiaNow.toTimeString().slice(0, 5);
+    setEndTime(malaysiaEndTime);
     setDuration(finalDurationStr);
 
     // --- Update location ---
@@ -725,10 +772,12 @@ const handleSubmit = async () => {
       setManpowerInput("");
     }
 
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
+
     const payload = {
       date,
       start_time: startTime,
-      end_time: now.toTimeString().slice(0, 5),
+      end_time: malaysiaEndTime,
       day,
       duration: finalDurationStr,
       damage_type: damageType,
@@ -738,8 +787,9 @@ const handleSubmit = async () => {
       sand: sand || null,
       aggregate: aggregate || null,
       premix: premix || null,
+      cement: cement || null,
       pipe_usage: pipeUsage || null,
-      fittings,
+      fittings: finalFittingsList,
       remarks,
       end_latitude: latitude,
       end_longitude: longitude,
@@ -897,7 +947,7 @@ const handleSubmit = async () => {
                   <Calendar className="w-5 h-5 mr-2" /> Timing & Outcome
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  <FormInput label="Date" type="date" placeholder="DD/MM/YYYY" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
+                  <FormInput label="Date" type="date" placeholder="YYYY-MM-DD" value={date ?? ""} onChange={(e) => setDate(e.target.value)} readOnly />
                   <FormInput label="Start Time" placeholder="Auto" value={startTime ?? ""} readOnly />
                   <FormInput label="End Time" placeholder="Auto" value={endTime ?? ""} readOnly />
                 </div>
@@ -962,6 +1012,12 @@ const handleSubmit = async () => {
                   onChange={setPremix}
                   showDepth={false}
                />
+               <DimensionInput
+                  label="Cement (kg)"
+                  value={cement}
+                  onChange={setCement}
+                  showDepth={false}
+               />
                <FormInput
                 label="Pipe Usage (m)"
                 placeholder="e.g. 5"
@@ -969,11 +1025,13 @@ const handleSubmit = async () => {
                 value={pipeUsage}
                 onChange={(e) => setPipeUsage(e.target.value)}
               />
-              <FormInput
+              <ListInput
                 label="Fittings"
-                placeholder="e.g. Coupling, Elbow"
-                value={fittings}
-                onChange={(e) => setFittings(e.target.value)}
+                items={fittings}
+                setItems={setFittings}
+                placeholder="Add fitting"
+                inputValue={fittingsInput}
+                setInputValue={setFittingsInput}
               />
             </div>
             <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />

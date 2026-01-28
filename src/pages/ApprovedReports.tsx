@@ -30,6 +30,7 @@ interface Report {
   sand?: Dimensions | null;
   aggregate?: Dimensions | null;
   premix?: Dimensions | null;
+  cement?: Dimensions | null;
   pipe_usage?: number | null;
 
   fittings?: string | null;
@@ -233,6 +234,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
                       label="Premix (kg)"
                       value={editableReport.premix || null}
                       onChange={(val) => handleChange("premix", val)}
+                      readOnly={!isRejected}
+                      showDepth={false}
+                  />
+                  <DimensionInput
+                      label="Cement (kg)"
+                      value={editableReport.cement || null}
+                      onChange={(val) => handleChange("cement", val)}
                       readOnly={!isRejected}
                       showDepth={false}
                   />
