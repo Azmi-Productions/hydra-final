@@ -100,7 +100,7 @@ interface ListInputProps {
 
 const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputValue }: ListInputProps) => {
 
-  const safeItems = Array.isArray(items) ? items : [];
+  const safeItems = Array.isArray(items) ? items.filter(item => item && item.trim()) : [];
 
   const addItem = () => {
     const trimmedValue = inputValue.trim();
@@ -108,14 +108,20 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
       // Don't add empty items
       return;
     }
-    setItems([...safeItems, trimmedValue]);
+    const newItems = [...items, trimmedValue];
+    setItems(newItems);
     setInputValue("");
   };
 
   const removeItem = (index: number) => {
-    const newItems = [...safeItems];
-    newItems.splice(index, 1);
-    setItems(newItems);
+    // Find the actual index in the original items array
+    const itemToRemove = safeItems[index];
+    const actualIndex = items.indexOf(itemToRemove);
+    if (actualIndex !== -1) {
+      const newItems = [...items];
+      newItems.splice(actualIndex, 1);
+      setItems(newItems);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -151,7 +157,7 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
         </button>
       </div>
       <ul className="list-disc list-inside space-y-1">
-        {safeItems.filter(item => item.trim()).map((item, idx) => (
+        {safeItems.map((item, idx) => (
           <li key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
             {item}
             <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700">
@@ -479,7 +485,8 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
             fitList = fitList.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
         }
     }
-    setFittings(Array.isArray(fitList) ? fitList : []);
+    // Filter out empty/whitespace-only strings regardless of source
+    setFittings(Array.isArray(fitList) ? fitList.filter((s: string) => s && s.trim()) : []);
 
     setPipeUsage(activity.pipe_usage || "");
     setRemarks(activity.remarks || "");
@@ -581,14 +588,9 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setManpowerInput("");
       }
 
-      const finalFittingsList = [...fittings];
-      if (fittingsInput.trim()) {
-        finalFittingsList.push(fittingsInput.trim());
-        setFittings(finalFittingsList);
-        setFittingsInput("");
-      }
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
-      const payload = {
+    const payload = {
         date,
         start_time: startTime,
         // Do not set end_time for draft
@@ -770,12 +772,7 @@ const handleSubmit = async () => {
       setManpowerInput("");
     }
 
-    const finalFittingsList = [...fittings];
-    if (fittingsInput.trim()) {
-      finalFittingsList.push(fittingsInput.trim());
-      setFittings(finalFittingsList);
-      setFittingsInput("");
-    }
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
     const payload = {
       date,
