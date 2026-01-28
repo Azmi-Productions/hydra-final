@@ -1437,26 +1437,39 @@ const handleSubmit = async () => {
                                  <input id="file-upload" type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleFileSelect} className="sr-only"/>
                                  
                                 {(photoFiles.length > 0 || uploadedPhotoUrls.length > 0) && (
-                                  <div className="grid grid-cols-3 gap-2">
-                                      {uploadedPhotoUrls.map((url, idx) => (
-                                         <div key={`url-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-gray-200 group">
-                                            <img src={url} className="w-full h-full object-cover" />
-                                         </div>
-                                      ))}
-                                      {photoFiles.map((file, idx) => (
-                                          <div key={`file-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
-                                              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 5)}...</div>
-                                               <button onClick={() => {
-                                                  const newFiles = [...photoFiles];
-                                                  newFiles.splice(idx, 1);
-                                                  setPhotoFiles(newFiles);
-                                               }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
-                                                  <X className="w-3 h-3" />
-                                               </button>
-                                          </div>
-                                      ))}
-                                  </div>
-                                )}
+  <div className="grid grid-cols-3 gap-2">
+      {/* Already Uploaded (Server URLs) */}
+      {uploadedPhotoUrls.map((url, idx) => (
+         <div key={`url-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-gray-200 group">
+            <img src={url} className="w-full h-full object-cover" />
+         </div>
+      ))}
+      
+      {/* Pending Uploads (Local Preview) */}
+      {photoFiles.map((file, idx) => (
+          <div key={`file-${idx}`} className="relative h-20 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
+              {file.type.startsWith('image/') ? (
+                <img 
+                  src={URL.createObjectURL(file)} 
+                  className="w-full h-full object-cover"
+                  onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)} // Optional: manage memory
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                  Video: {file.name.substring(0, 5)}...
+                </div>
+              )}
+               <button onClick={() => {
+                  const newFiles = [...photoFiles];
+                  newFiles.splice(idx, 1);
+                  setPhotoFiles(newFiles);
+               }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
+                  <X className="w-3 h-3" />
+               </button>
+          </div>
+      ))}
+  </div>
+)}
                           </div>
                           
                           {/* Actions */}
@@ -1520,25 +1533,34 @@ const handleSubmit = async () => {
                                 </button>
                               </div>
                             ))}
-                            {photos.files.map((file, idx) => (
-                              <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
-                                <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
-                                  <Camera className="w-8 h-8 text-gray-400"/>
-                                  <span className="text-sm text-gray-500 font-medium">{file.name}</span>
-                                </div>
-                                <button onClick={() => {
-                                  setMaintenancePhotos(prev => ({
-                                    ...prev,
-                                    [cat.key]: {
-                                      ...prev[cat.key],
-                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
-                                    }
-                                  }));
-                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                          {/* Find this section in the Maintenance Tab */}
+{photos.files.map((file, idx) => (
+  <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
+    {file.type.startsWith('image/') ? (
+      <img 
+        src={URL.createObjectURL(file)} 
+        className="w-full h-full object-cover" 
+        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+      />
+    ) : (
+      <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
+        <Camera className="w-8 h-8 text-gray-400"/>
+        <span className="text-sm text-gray-500 font-medium">{file.name}</span>
+      </div>
+    )}
+    <button onClick={() => {
+      setMaintenancePhotos(prev => ({
+        ...prev,
+        [cat.key]: {
+          ...prev[cat.key],
+          files: prev[cat.key].files.filter((_, i) => i !== idx)
+        }
+      }));
+    }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm">
+      <X className="w-4 h-4" />
+    </button>
+  </div>
+))}
                           </div>
                         )}
                       </div>
@@ -1604,25 +1626,35 @@ const handleSubmit = async () => {
                                 </button>
                               </div>
                             ))}
-                            {photos.files.map((file, idx) => (
-                              <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
-                                <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
-                                  <Camera className="w-8 h-8 text-gray-400"/>
-                                  <span className="text-sm text-gray-500 font-medium">{file.name}</span>
-                                </div>
-                                <button onClick={() => {
-                                  setPremixPhotos(prev => ({
-                                    ...prev,
-                                    [cat.key]: {
-                                      ...prev[cat.key],
-                                      files: prev[cat.key].files.filter((_, i) => i !== idx)
-                                    }
-                                  }));
-                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                           
+{/* Find this section in the Premix Tab */}
+{photos.files.map((file, idx) => (
+  <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
+    {file.type.startsWith('image/') ? (
+      <img 
+        src={URL.createObjectURL(file)} 
+        className="w-full h-full object-cover"
+        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+      />
+    ) : (
+      <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
+        <Camera className="w-8 h-8 text-gray-400"/>
+        <span className="text-sm text-gray-500 font-medium">{file.name}</span>
+      </div>
+    )}
+    <button onClick={() => {
+      setPremixPhotos(prev => ({
+        ...prev,
+        [cat.key]: {
+          ...prev[cat.key],
+          files: prev[cat.key].files.filter((_, i) => i !== idx)
+        }
+      }));
+    }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm">
+      <X className="w-4 h-4" />
+    </button>
+  </div>
+))}
                           </div>
                         )}
                       </div>
