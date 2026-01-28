@@ -495,10 +495,11 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
           </p>
 
+         {/* Original Media Attachments */}
          {editableReport.photo_link && editableReport.photo_link.length > 0 && (
   <section className="space-y-4 pt-4">
     <h3 className={sectionHeaderStyle}>
-      <FolderOpen className={iconStyle} /> Media Attachments
+      <FolderOpen className={iconStyle} /> General Media Attachments
     </h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       {editableReport.photo_link.map((url, idx) => {
@@ -540,6 +541,120 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     </div>
   </section>
 )}
+
+         {/* Maintenance Photos */}
+         {(() => {
+           let maintenancePhotos: string[] = [];
+           if (editableReport.photo_link && editableReport.photo_link.length > 0) {
+             try {
+               const parsed = JSON.parse(editableReport.photo_link[0]);
+               if (parsed.maintenance) {
+                 maintenancePhotos = Object.values(parsed.maintenance).flat() as string[];
+               }
+             } catch (e) {}
+           }
+           return maintenancePhotos.length > 0 && (
+             <section className="space-y-4 pt-4">
+               <h3 className={sectionHeaderStyle}>
+                 <FolderOpen className={iconStyle} /> Maintenance Photos
+               </h3>
+               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                 {maintenancePhotos.map((url, idx) => {
+                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+
+                   return (
+                     <a
+                       key={idx}
+                       href={url}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="block group"
+                     >
+                       {isVideo ? (
+                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                           <video
+                             src={url}
+                             className="w-full h-full object-cover"
+                             muted
+                             playsInline
+                             preload="metadata"
+                           />
+                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <Play className="w-6 h-6 text-white" />
+                           </div>
+                         </div>
+                       ) : (
+                         <img
+                           src={url}
+                           alt={`Maintenance Photo ${idx + 1}`}
+                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
+                           loading="lazy"
+                         />
+                       )}
+                     </a>
+                   );
+                 })}
+               </div>
+             </section>
+           );
+         })()}
+
+         {/* Premix Photos */}
+         {(() => {
+           let premixPhotos: string[] = [];
+           if (editableReport.photo_link && editableReport.photo_link.length > 0) {
+             try {
+               const parsed = JSON.parse(editableReport.photo_link[0]);
+               if (parsed.premix) {
+                 premixPhotos = Object.values(parsed.premix).flat() as string[];
+               }
+             } catch (e) {}
+           }
+           return premixPhotos.length > 0 && (
+             <section className="space-y-4 pt-4">
+               <h3 className={sectionHeaderStyle}>
+                 <FolderOpen className={iconStyle} /> Premix Photos
+               </h3>
+               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                 {premixPhotos.map((url, idx) => {
+                   const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
+
+                   return (
+                     <a
+                       key={idx}
+                       href={url}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="block group"
+                     >
+                       {isVideo ? (
+                         <div className="relative w-full h-32 bg-black rounded-lg border border-gray-200 overflow-hidden">
+                           <video
+                             src={url}
+                             className="w-full h-full object-cover"
+                             muted
+                             playsInline
+                             preload="metadata"
+                           />
+                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <Play className="w-6 h-6 text-white" />
+                           </div>
+                         </div>
+                       ) : (
+                         <img
+                           src={url}
+                           alt={`Premix Photo ${idx + 1}`}
+                           className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-lg transition"
+                           loading="lazy"
+                         />
+                       )}
+                     </a>
+                   );
+                 })}
+               </div>
+             </section>
+           );
+         })()}
 
           {/* Remarks */}
           <section className="space-y-4 pt-4">
