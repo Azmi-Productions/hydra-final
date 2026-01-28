@@ -11,7 +11,6 @@ import { Toaster } from "react-hot-toast";
 import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
 import LocationHistoryPage from "./pages/LocationHistory.tsx";
-import Register from "./pages/Register.tsx";
 
 function AppWrapper() {
   const location = useLocation();
