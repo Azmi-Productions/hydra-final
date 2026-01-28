@@ -30,6 +30,7 @@ interface Report {
   sand?: number | null;
   aggregate?: number | null;
   premix?: number | null;
+  cement?: number | null;
   pipe_usage?: number | null;
   
   fittings?: string | null;
@@ -160,7 +161,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      }
   };
 
-  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
+  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
 
   const handleChange = (field: keyof Report, value: string | number) => {
@@ -474,6 +475,10 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
               <div className="space-y-1">
                 <label className={labelStyle}>Premix (kg)</label>
                 <input type="number" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} className={inputStyle} />
+              </div>
+              <div className="space-y-1">
+                <label className={labelStyle}>Cement (kg)</label>
+                <input type="number" value={editableReport.cement ?? ""} onChange={(e) => handleChange("cement", e.target.value)} className={inputStyle} />
               </div>
               <div className="space-y-1">
                 <label className={labelStyle}>Pipe Usage (m)</label>
@@ -847,9 +852,9 @@ export default function ReportsListPage() {
 
     // Define columns
     const headers = [
-      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)", 
-      "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)", 
-      "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Pipe Usage (m)", "Fittings", 
+      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)",
+      "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)",
+      "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Cement (kg)", "Pipe Usage (m)", "Fittings",
       "Remarks", "Start Lat", "Start Long", "End Lat", "End Long", "Status", "Submitted By"
     ];
 
@@ -879,6 +884,7 @@ export default function ReportsListPage() {
         escapeCSV(row.sand || 0),
         escapeCSV(row.aggregate || 0),
         escapeCSV(row.premix || 0),
+        escapeCSV(row.cement || 0),
         escapeCSV(row.pipe_usage || 0),
         escapeCSV(row.fittings),
         escapeCSV(row.remarks), 

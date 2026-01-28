@@ -168,13 +168,15 @@ export default function ReportSubmissionPage() {
   const [sand, setSand] = useState<Dimensions | null>(null);
   const [aggregate, setAggregate] = useState<Dimensions | null>(null);
   const [premix, setPremix] = useState<Dimensions | null>(null);
+  const [cement, setCement] = useState<Dimensions | null>(null);
   const [pipeUsage, setPipeUsage] = useState("");
-  const [fittings, setFittings] = useState("");
+  const [fittings, setFittings] = useState<string[]>([]);
   const [remarks, setRemarks] = useState("");
   
   // Pending inputs for lists
   const [equipmentInput, setEquipmentInput] = useState("");
   const [manpowerInput, setManpowerInput] = useState("");
+  const [fittingsInput, setFittingsInput] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [gmapLink, setGmapLink] = useState("");
@@ -452,8 +454,15 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSand(parseDimensions(activity.sand));
     setAggregate(parseDimensions(activity.aggregate));
     setPremix(parseDimensions(activity.premix));
+    setCement(parseDimensions(activity.cement));
+
+    let fitList = activity.fittings;
+    if (typeof fitList === 'string') {
+        try { fitList = JSON.parse(fitList); } catch(e) { fitList = []; }
+    }
+    setFittings(Array.isArray(fitList) ? fitList : []);
+
     setPipeUsage(activity.pipe_usage || "");
-    setFittings(activity.fittings || "");
     setRemarks(activity.remarks || "");
     setEndTime(activity.end_time || "");
     setDuration(activity.duration || "");
@@ -553,6 +562,13 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setManpowerInput("");
       }
 
+      const finalFittingsList = [...fittings];
+      if (fittingsInput.trim()) {
+        finalFittingsList.push(fittingsInput.trim());
+        setFittings(finalFittingsList);
+        setFittingsInput("");
+      }
+
       const payload = {
         date,
         start_time: startTime,
@@ -566,8 +582,9 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         sand: sand || null,
         aggregate: aggregate || null,
         premix: premix || null,
+        cement: cement || null,
         pipe_usage: pipeUsage || null,
-        fittings,
+        fittings: finalFittingsList,
         remarks,
         // Do not update end location for draft
         photo_link: photoLinks,
@@ -734,6 +751,13 @@ const handleSubmit = async () => {
       setManpowerInput("");
     }
 
+    const finalFittingsList = [...fittings];
+    if (fittingsInput.trim()) {
+      finalFittingsList.push(fittingsInput.trim());
+      setFittings(finalFittingsList);
+      setFittingsInput("");
+    }
+
     const payload = {
       date,
       start_time: startTime,
@@ -747,8 +771,9 @@ const handleSubmit = async () => {
       sand: sand || null,
       aggregate: aggregate || null,
       premix: premix || null,
+      cement: cement || null,
       pipe_usage: pipeUsage || null,
-      fittings,
+      fittings: finalFittingsList,
       remarks,
       end_latitude: latitude,
       end_longitude: longitude,
@@ -971,6 +996,12 @@ const handleSubmit = async () => {
                   onChange={setPremix}
                   showDepth={false}
                />
+               <DimensionInput
+                  label="Cement (kg)"
+                  value={cement}
+                  onChange={setCement}
+                  showDepth={false}
+               />
                <FormInput
                 label="Pipe Usage (m)"
                 placeholder="e.g. 5"
@@ -978,11 +1009,13 @@ const handleSubmit = async () => {
                 value={pipeUsage}
                 onChange={(e) => setPipeUsage(e.target.value)}
               />
-              <FormInput
+              <ListInput
                 label="Fittings"
-                placeholder="e.g. Coupling, Elbow"
-                value={fittings}
-                onChange={(e) => setFittings(e.target.value)}
+                items={fittings}
+                setItems={setFittings}
+                placeholder="Add fitting"
+                inputValue={fittingsInput}
+                setInputValue={setFittingsInput}
               />
             </div>
             <FormTextarea label="Remarks" placeholder="Any remarks..." value={remarks} onChange={(e) => setRemarks(e.target.value)} />
