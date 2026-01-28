@@ -654,20 +654,20 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                               <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
                                   {cat.label}
                               </h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 gap-6">
                                   {photos.map((url, idx) => {
                                      const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                      return (
                                         <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
                                             {isVideo ? (
-                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                <div className="w-full h-64 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
                                                     <video src={url} className="w-full h-full object-cover opacity-80" />
                                                     <div className="absolute inset-0 flex items-center justify-center">
-                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                        <Play className="w-12 h-12 text-white opacity-80" />
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                                <img src={url} alt={cat.label} className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
                                             )}
                                         </a>
                                      );
@@ -704,20 +704,20 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                               <h4 className="font-semibold text-gray-700 mb-3 border-l-4 border-indigo-500 pl-3">
                                   {cat.label}
                               </h4>
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 gap-6">
                                   {photos.map((url, idx) => {
                                      const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                      return (
                                         <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group relative">
                                             {isVideo ? (
-                                                <div className="w-full h-24 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+                                                <div className="w-full h-64 bg-black rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
                                                     <video src={url} className="w-full h-full object-cover opacity-80" />
                                                     <div className="absolute inset-0 flex items-center justify-center">
-                                                        <Play className="w-8 h-8 text-white opacity-80" />
+                                                        <Play className="w-12 h-12 text-white opacity-80" />
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <img src={url} alt={cat.label} className="w-full h-24 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
+                                                <img src={url} alt={cat.label} className="w-full h-64 object-cover rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition" />
                                             )}
                                         </a>
                                      );

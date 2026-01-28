@@ -403,16 +403,16 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
                         return (
                             <div key={cat.key} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                                 <h4 className="text-sm font-bold text-blue-700 mb-3 border-b pb-1">{cat.label}</h4>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-4">
                                     {photos.map((url, idx) => {
                                         const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                         return (
-                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-24">
+                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-64">
                                             {isVideo ? (
                                               <div className="relative w-full h-full bg-black rounded-lg border border-gray-200 overflow-hidden">
                                                 <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                  <Play className="w-4 h-4 text-white" />
+                                                  <Play className="w-12 h-12 text-white" />
                                                 </div>
                                               </div>
                                             ) : (
@@ -446,16 +446,16 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
                         return (
                             <div key={cat.key} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                                 <h4 className="text-sm font-bold text-blue-700 mb-3 border-b pb-1">{cat.label}</h4>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-4">
                                     {photos.map((url, idx) => {
                                         const isVideo = /\.(mp4|mov|avi|wmv|flv|webm|mkv)($|\?)/i.test(url);
                                         return (
-                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-24">
+                                           <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block group w-full h-64">
                                             {isVideo ? (
                                               <div className="relative w-full h-full bg-black rounded-lg border border-gray-200 overflow-hidden">
                                                 <video src={url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                  <Play className="w-4 h-4 text-white" />
+                                                  <Play className="w-12 h-12 text-white" />
                                                 </div>
                                               </div>
                                             ) : (

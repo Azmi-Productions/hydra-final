@@ -1494,18 +1494,18 @@ const handleSubmit = async () => {
                       <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
                         <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
                         <label htmlFor={`maintenance-upload-${cat.key}`} className="block cursor-pointer">
-                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
-                            <div className="flex flex-col items-center space-y-1 text-center">
-                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
-                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                          <div className="flex items-center justify-center h-32 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-2 text-center">
+                              <Camera className="w-8 h-8 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-sm font-semibold text-blue-600">Add Photo</span>
                             </div>
                           </div>
                         </label>
                         <input id={`maintenance-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handleMaintenanceFileSelect(cat.key)} className="sr-only"/>
                         {(photos.files.length > 0 || photos.urls.length > 0) && (
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 gap-4">
                             {photos.urls.map((url, idx) => (
-                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                              <div key={`url-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-gray-200 shadow-md">
                                 <img src={url} className="w-full h-full object-cover" />
                                 <button onClick={() => {
                                   setMaintenancePhotos(prev => ({
@@ -1515,14 +1515,17 @@ const handleSubmit = async () => {
                                       urls: prev[cat.key].urls.filter((_, i) => i !== idx)
                                     }
                                   }));
-                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
-                                  <X className="w-3 h-3" />
+                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
                             {photos.files.map((file, idx) => (
-                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
-                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                              <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
+                                  <Camera className="w-8 h-8 text-gray-400"/>
+                                  <span className="text-sm text-gray-500 font-medium">{file.name}</span>
+                                </div>
                                 <button onClick={() => {
                                   setMaintenancePhotos(prev => ({
                                     ...prev,
@@ -1531,8 +1534,8 @@ const handleSubmit = async () => {
                                       files: prev[cat.key].files.filter((_, i) => i !== idx)
                                     }
                                   }));
-                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
-                                  <X className="w-3 h-3" />
+                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
@@ -1575,18 +1578,18 @@ const handleSubmit = async () => {
                       <div key={cat.key} className="bg-white shadow-xl rounded-3xl p-6 border border-gray-100 space-y-4">
                         <h3 className="text-lg font-semibold text-blue-700 border-b pb-2">{cat.label}</h3>
                         <label htmlFor={`premix-upload-${cat.key}`} className="block cursor-pointer">
-                          <div className="flex items-center justify-center h-16 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
-                            <div className="flex flex-col items-center space-y-1 text-center">
-                              <Camera className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
-                              <span className="text-xs font-semibold text-blue-600">Add Photo</span>
+                          <div className="flex items-center justify-center h-32 border-2 border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50 hover:bg-blue-50 transition-all duration-200 group">
+                            <div className="flex flex-col items-center space-y-2 text-center">
+                              <Camera className="w-8 h-8 text-blue-500 group-hover:scale-110 transition-transform" />
+                              <span className="text-sm font-semibold text-blue-600">Add Photo</span>
                             </div>
                           </div>
                         </label>
                         <input id={`premix-upload-${cat.key}`} type="file" accept="image/*,video/*" multiple capture="environment" onChange={handlePremixFileSelect(cat.key)} className="sr-only"/>
                         {(photos.files.length > 0 || photos.urls.length > 0) && (
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 gap-4">
                             {photos.urls.map((url, idx) => (
-                              <div key={`url-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-gray-200">
+                              <div key={`url-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-gray-200 shadow-md">
                                 <img src={url} className="w-full h-full object-cover" />
                                 <button onClick={() => {
                                   setPremixPhotos(prev => ({
@@ -1596,14 +1599,17 @@ const handleSubmit = async () => {
                                       urls: prev[cat.key].urls.filter((_, i) => i !== idx)
                                     }
                                   }));
-                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
-                                  <X className="w-3 h-3" />
+                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
                             {photos.files.map((file, idx) => (
-                              <div key={`file-${idx}`} className="relative h-16 rounded-lg overflow-hidden border border-blue-300 shadow-sm">
-                                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{file.name.substring(0, 8)}...</div>
+                              <div key={`file-${idx}`} className="relative h-64 rounded-xl overflow-hidden border border-blue-300 shadow-md">
+                                <div className="w-full h-full bg-gray-100 flex items-center justify-center flex-col gap-2">
+                                  <Camera className="w-8 h-8 text-gray-400"/>
+                                  <span className="text-sm text-gray-500 font-medium">{file.name}</span>
+                                </div>
                                 <button onClick={() => {
                                   setPremixPhotos(prev => ({
                                     ...prev,
@@ -1612,8 +1618,8 @@ const handleSubmit = async () => {
                                       files: prev[cat.key].files.filter((_, i) => i !== idx)
                                     }
                                   }));
-                                }} className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl-lg">
-                                  <X className="w-3 h-3" />
+                                }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-sm hover:scale-110 transition">
+                                  <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
