@@ -3,7 +3,7 @@ import toast from "../utils/toast";
 import { MapPin, Calendar, Briefcase, Camera, X, Trash2, Loader2, ArrowLeft, Play } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
-
+//old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -100,18 +100,28 @@ interface ListInputProps {
 
 const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputValue }: ListInputProps) => {
 
-  const safeItems = Array.isArray(items) ? items : [];
+  const safeItems = Array.isArray(items) ? items.filter(item => item && item.trim()) : [];
 
   const addItem = () => {
-    if (!inputValue.trim()) return;
-    setItems([...safeItems, inputValue.trim()]);
+    const trimmedValue = inputValue.trim();
+    if (trimmedValue === "") {
+      // Don't add empty items
+      return;
+    }
+    const newItems = [...items, trimmedValue];
+    setItems(newItems);
     setInputValue("");
   };
 
   const removeItem = (index: number) => {
-    const newItems = [...safeItems];
-    newItems.splice(index, 1);
-    setItems(newItems);
+    // Find the actual index in the original items array
+    const itemToRemove = safeItems[index];
+    const actualIndex = items.indexOf(itemToRemove);
+    if (actualIndex !== -1) {
+      const newItems = [...items];
+      newItems.splice(actualIndex, 1);
+      setItems(newItems);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -133,7 +143,16 @@ const ListInput = ({ label, items, setItems, placeholder, inputValue, setInputVa
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
         />
-        <button type="button" onClick={addItem} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition">
+        <button
+          type="button"
+          onClick={addItem}
+          disabled={!inputValue.trim()}
+          className={`px-4 py-2 font-semibold rounded-xl transition ${
+            inputValue.trim()
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
+        >
           Add
         </button>
       </div>
@@ -458,9 +477,16 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     let fitList = activity.fittings;
     if (typeof fitList === 'string') {
-        try { fitList = JSON.parse(fitList); } catch(e) { fitList = []; }
+        // Try to parse as JSON array first
+        try {
+            fitList = JSON.parse(fitList);
+        } catch(e) {
+            // If JSON parsing fails, treat as comma-separated string
+            fitList = fitList.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+        }
     }
-    setFittings(Array.isArray(fitList) ? fitList : []);
+    // Filter out empty/whitespace-only strings regardless of source
+    setFittings(Array.isArray(fitList) ? fitList.filter((s: string) => s && s.trim()) : []);
 
     setPipeUsage(activity.pipe_usage || "");
     setRemarks(activity.remarks || "");
@@ -562,14 +588,9 @@ const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         setManpowerInput("");
       }
 
-      const finalFittingsList = [...fittings];
-      if (fittingsInput.trim()) {
-        finalFittingsList.push(fittingsInput.trim());
-        setFittings(finalFittingsList);
-        setFittingsInput("");
-      }
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
-      const payload = {
+    const payload = {
         date,
         start_time: startTime,
         // Do not set end_time for draft
@@ -751,12 +772,7 @@ const handleSubmit = async () => {
       setManpowerInput("");
     }
 
-    const finalFittingsList = [...fittings];
-    if (fittingsInput.trim()) {
-      finalFittingsList.push(fittingsInput.trim());
-      setFittings(finalFittingsList);
-      setFittingsInput("");
-    }
+    const finalFittingsList = [...fittings].filter(item => item && item.trim());
 
     const payload = {
       date,
