@@ -115,26 +115,29 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   const [saving, setSaving] = useState(false);
 
   // --- Fetch all reports for this activity ID ---
-  const fetchActivityReports = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?activity_id=eq.${report.activity_id}&select=*`, { headers });
-      if (!res.ok) throw new Error("Failed to fetch activity reports");
-      const data: Report[] = await res.json();
-      setReports(data);
-       
-      // Reset editable to current active
-      // Find the one that matches the original passed 'report.id' if possible, or just stay at 0
-      const currentId = activeReport.id; 
-      const newIdx = data.findIndex(r => r.id === currentId);
-      if (newIdx !== -1) setActiveReportIdx(newIdx);
+ const fetchActivityReports = async () => {
+  setLoading(true);
+  try {
+    // Extract base ID to find all related sub-reports
+    const baseId = report.activity_id.split('-')[0];
+    
+    // Use 'ilike' with a wildcard to find '1232', '1232-1', '1232-2', etc.
+    const res = await fetch(`${supabaseUrl}/rest/v1/reports?activity_id=ilike.${baseId}*&select=*&order=activity_id.asc`, { headers });
+    
+    if (!res.ok) throw new Error("Failed to fetch activity reports");
+    const data: Report[] = await res.json();
+    setReports(data);
+     
+    const currentId = activeReport.id; 
+    const newIdx = data.findIndex(r => r.id === currentId);
+    if (newIdx !== -1) setActiveReportIdx(newIdx);
 
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load all reports for this activity.");
-    }
-    setLoading(false);
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to load related reports.");
+  }
+  setLoading(false);
+};
 
   // --- Fetch Supervisors for Dropdown ---
   const fetchSupervisors = async () => {
@@ -158,48 +161,58 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     setEditableReport({ ...reports[activeReportIdx] });
   }, [activeReportIdx, reports]);
 
-  const handleAddSupervisor = async (username: string) => {
-     if (!confirm(`Assign ${username} to this activity?`)) return;
-     setSaving(true);
-     try {
-        // Use Malaysia time zone
-        const now = new Date();
-        const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
-        const timeStr = malaysiaTime.toTimeString().slice(0, 5);
-        const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
-        const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+ const handleAddSupervisor = async (username: string) => {
+  if (!confirm(`Assign ${username} to this activity?`)) return;
+  setSaving(true);
+  try {
+    // Determine the base ID (e.g., '1232' from '1232' or '1232-1')
+    const baseId = report.activity_id.split('-')[0];
+    
+    // Count existing reports that start with this baseId to get the next suffix
+    const nextSuffix = reports.length; 
+    const newActivityId = `${baseId}-${nextSuffix}`;
 
-        const payload = {
-           activity_id: report.activity_id,
-           date: todayStr,
-           start_time: timeStr,
-           day: weekdayStr,
-           status: 'Started',
-           submitted_by: username,
-           // Copy basic location/timing from original if available, or leave blank?
-           // Let's just init minimal
-           duration: 0
-        };
+    const now = new Date();
+    const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+    const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+    const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`;
+    const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
-        const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
-            method: 'POST', 
-            headers: { ...headers, "Prefer": "return=representation" },
-            body: JSON.stringify(payload)
-        });
+    // Only include essential starting fields to prevent duplicating old data
+    const payload = {
+      activity_id: newActivityId,
+      date: todayStr,
+      start_time: timeStr,
+      day: weekdayStr,
+      status: 'Started',
+      submitted_by: username,
+      duration: 0,
+      damage_type: '', // Carry over the category but not the photos/results
+      equipment_used: '',
+      manpower_involved: '',
+      photo_link: null, // Ensure photo links start empty
+      remarks: null
+    };
 
-        if (!res.ok) throw new Error("Failed to add supervisor");
+    const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
+        method: 'POST', 
+        headers: { ...headers, "Prefer": "return=representation" },
+        body: JSON.stringify(payload)
+    });
 
-        toast.success(`Supervisor ${username} added!`);
-        setShowAddSupervisor(false);
-        fetchActivityReports(); // Reload tabs
+    if (!res.ok) throw new Error("Failed to add supervisor");
 
-     } catch(e) {
-        console.error(e);
-        toast.error("Failed to add supervisor.");
-     } finally {
-        setSaving(false);
-     }
-  };
+    toast.success(`Supervisor ${username} assigned to ${newActivityId}`);
+    setShowAddSupervisor(false);
+    fetchActivityReports(); // Refresh the tab list
+
+  } catch(e) {
+    console.error(e);
+    toast.error("Failed to add supervisor.");
+  } finally {
+    setSaving(false);
+  }
+};
 
   const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
@@ -900,53 +913,54 @@ export default function ReportsListPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [activeTab, setActiveTab] = useState<'Ongoing' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
 
-  const fetchReports = async () => {
-    setLoading(true);
-    try {
-      // 1. Fetch all reports sorted by created_at desc
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&order=created_at.desc`, { headers });
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data: Report[] = await res.json();
+ const fetchReports = async () => {
+  setLoading(true);
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&order=created_at.desc`, { headers });
+    if (!res.ok) throw new Error("Failed to fetch");
+    const data: Report[] = await res.json();
+    
+    const grouped: { [key: string]: Report[] } = {};
+    
+    data.forEach(r => {
+      // Logic: Strip the suffix to find the Parent ID
+      // If activity_id is "1232-1", parentId becomes "1232"
+      const parentId = r.activity_id.split('-')[0];
       
-      const grouped: { [key: string]: Report[] } = {};
-      data.forEach(r => {
-        if (!grouped[r.activity_id]) grouped[r.activity_id] = [];
-        grouped[r.activity_id].push(r);
-      });
+      if (!grouped[parentId]) grouped[parentId] = [];
+      grouped[parentId].push(r);
+    });
 
-      const uniqueActivityReports: Report[] = [];
+    const uniqueActivityReports: Report[] = [];
 
-      Object.keys(grouped).forEach(actId => {
-          const group = grouped[actId];
-          // Determine "representative" report for list view
-          // Priority: Pending > Started > Approved > Rejected (or similar?)
-          // Actually, let's just pick the latest one, BUT override status if any is Pending
-          
-          const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
-          const hasStarted = group.some(r => r.status === 'Started');
-          
-          
-          // Let's use the layout of the latest report for details (date, damage type etc)
-          // But status should reflect if there is 'work to do' (Pending)
-          
-          const latest = group[0]; // Assuming sorted by desc
-          
-          let displayStatus = latest.status;
-          if (hasPending) displayStatus = 'Pending';
-          else if (hasStarted) displayStatus = 'Ongoing'; // Map Started -> Ongoing tab
-          else if (group.every(r => r.status === 'Approved')) displayStatus = 'Approved';
-          else if (group.every(r => r.status === 'Rejected')) displayStatus = 'Rejected';
-          
-          uniqueActivityReports.push({ ...latest, status: displayStatus });
-      });
+    Object.keys(grouped).forEach(parentId => {
+        const group = grouped[parentId];
+        
+        // Check status across the whole group
+        const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
+        const hasStarted = group.some(r => r.status === 'Started');
+        
+        // Use the very first original report (usually the one without a dash) 
+        // as the display data, or the latest created one.
+        const latest = group[0];
+        
+        let displayStatus = latest.status;
+        if (hasPending) displayStatus = 'Pending';
+        else if (hasStarted) displayStatus = 'Ongoing';
+        else if (group.every(r => r.status === 'Approved')) displayStatus = 'Approved';
+        else if (group.every(r => r.status === 'Rejected')) displayStatus = 'Rejected';
+        
+        // Override the ID for display purposes so it always shows the Parent ID
+        uniqueActivityReports.push({ ...latest, activity_id: parentId, status: displayStatus });
+    });
 
-      setReports(uniqueActivityReports);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to fetch reports");
-    }
-    setLoading(false);
-  };
+    setReports(uniqueActivityReports);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed to fetch reports");
+  }
+  setLoading(false);
+};
 
   useEffect(() => {
     fetchReports();
