@@ -2,6 +2,7 @@ import { useEffect, useState, MouseEventHandler } from "react";
 import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
+import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -26,11 +27,11 @@ interface Report {
   manpower_involved: string;
   
   // These optional fields must allow `null` from the database and during save.
-  excavation?: number | null;
-  sand?: number | null;
-  aggregate?: number | null;
-  premix?: number | null;
-  cement?: number | null;
+    excavation?: Dimensions | null;
+  sand?: Dimensions | null;
+  aggregate?: Dimensions | null;
+  premix?: Dimensions | null;
+  cement?: Dimensions | null;
   pipe_usage?: number | null;
   
   fittings?: string | null;
@@ -203,22 +204,25 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
 
-  const handleChange = (field: keyof Report, value: string | number) => {
-    let finalValue: string | number | null | undefined = value;
-    
-    // Logic for optional number fields
-    if (typeof value === 'string' && optionalNullableNumberFields.includes(field)) {
-      const numValue = Number(value);
-      finalValue = value.trim() === '' || isNaN(numValue) ? undefined : numValue;
-    }
-    
-    // Logic for optional string fields
-    if (typeof value === 'string' && optionalNullableStringFields.includes(field)) {
-        finalValue = value.trim() === '' ? undefined : value;
-    }
-    
-    setEditableReport(prev => ({ ...prev, [field]: finalValue } as any));
-  };
+// 1. Update the type signature to include Dimensions | null
+const handleChange = (field: keyof Report, value: string | number | Dimensions | null) => {
+  let finalValue: any = value;
+  
+  // Logic for optional number fields (like pipe_usage)
+  if (typeof value === 'string' && optionalNullableNumberFields.includes(field)) {
+    const numValue = Number(value);
+    finalValue = value.trim() === '' || isNaN(numValue) ? null : numValue;
+  }
+  
+  // Logic for optional string fields (like fittings, remarks)
+  if (typeof value === 'string' && optionalNullableStringFields.includes(field)) {
+      finalValue = value.trim() === '' ? null : value;
+  }
+
+  
+  
+  setEditableReport(prev => ({ ...prev, [field]: finalValue }));
+};
 
 
 
@@ -546,38 +550,52 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
           {/* Materials */}
           <section className="space-y-4 pt-4">
-            <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className={labelStyle}>Excavation (m³)</label>
-                <input type="number" value={editableReport.excavation ?? ""} onChange={(e) => handleChange("excavation", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Sand (m³)</label>
-                <input type="number" value={editableReport.sand ?? ""} onChange={(e) => handleChange("sand", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Aggregate (m³)</label>
-                <input type="number" value={editableReport.aggregate ?? ""} onChange={(e) => handleChange("aggregate", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Premix (kg)</label>
-                <input type="number" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Cement (kg)</label>
-                <input type="number" value={editableReport.cement ?? ""} onChange={(e) => handleChange("cement", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Pipe Usage (m)</label>
-                <input type="number" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Fittings</label>
-                <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)} className={inputStyle} />
-              </div>
-            </div>
-          </section>
+                    <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="col-span-2 sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <DimensionInput
+                              label="Excavation (m³)"
+                              value={editableReport.excavation || null}
+                              onChange={(val) => handleChange("excavation", val)}
+                             
+                          />
+                          <DimensionInput
+                              label="Sand (m³)"
+                              value={editableReport.sand || null}
+                              onChange={(val) => handleChange("sand", val)}
+                              
+                          />
+                          <DimensionInput
+                              label="Aggregate (m³)"
+                              value={editableReport.aggregate || null}
+                              onChange={(val) => handleChange("aggregate", val)}
+                             
+                          />
+                          <DimensionInput
+                              label="Premix (kg)"
+                              value={editableReport.premix || null}
+                              onChange={(val) => handleChange("premix", val)}
+                             
+                              showDepth={false}
+                          />
+                          <DimensionInput
+                              label="Cement (kg)"
+                              value={editableReport.cement || null}
+                              onChange={(val) => handleChange("cement", val)}
+                             
+                              showDepth={false}
+                          />
+                      </div>
+                       <div className="space-y-1">
+                        <label className={labelStyle}>Pipe Usage (m)</label>
+                        <input type="text" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className={labelStyle}>Fittings</label>
+                        <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)}  className={inputStyle} />
+                      </div>
+                    </div>
+                  </section>
 
           <p className="text-xl text-gray-500  mt-1">
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
@@ -890,11 +908,6 @@ export default function ReportsListPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data: Report[] = await res.json();
       
-      // 2. Group by activity_id -> picking the "most relevant" one for the list view
-      // We want to display ONE card per activity_id.
-      // Logic: If any report in the group is 'Pending', show as 'Pending'.
-      // If all are 'Approved', show 'Approved'. etc.
-      
       const grouped: { [key: string]: Report[] } = {};
       data.forEach(r => {
         if (!grouped[r.activity_id]) grouped[r.activity_id] = [];
@@ -1041,6 +1054,14 @@ export default function ReportsListPage() {
       const escaped = stringValue.replace(/"/g, '""'); 
       return `"${escaped}"`;
     };
+    const formatDimension = (dim: Dimensions | null | undefined) => {
+      if (!dim) return "0";
+      // Convert the string properties from the Dimensions interface
+      const l = parseFloat(dim.length) || 0;
+      const w = parseFloat(dim.width) || 0;
+      const d = parseFloat(dim.depth) || 1; // Use 1 as multiplier if depth is empty
+      return (l * w * d).toFixed(2); 
+    };
 
     for (const row of data) {
       const values = [
@@ -1054,11 +1075,11 @@ export default function ReportsListPage() {
         escapeCSV(row.damage_type),
         escapeCSV(row.equipment_used),
         escapeCSV(row.manpower_involved),
-        escapeCSV(row.excavation || 0),
-        escapeCSV(row.sand || 0),
-        escapeCSV(row.aggregate || 0),
-        escapeCSV(row.premix || 0),
-        escapeCSV(row.cement || 0),
+      escapeCSV(formatDimension(row.excavation)),
+        escapeCSV(formatDimension(row.sand)),
+        escapeCSV(formatDimension(row.aggregate)),
+        escapeCSV(formatDimension(row.premix)),
+        escapeCSV(formatDimension(row.cement)),
         escapeCSV(row.pipe_usage || 0),
         escapeCSV(row.fittings),
         escapeCSV(row.remarks), 
