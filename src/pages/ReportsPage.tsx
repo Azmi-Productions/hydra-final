@@ -222,11 +222,11 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      setSaving(true);
      try {
         // Use Malaysia time zone
-        const now = new Date();
-        const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+        
+       
 
-        const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
-        const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+        
+       
 
   
          // Logic to calculate next suffix
@@ -251,18 +251,16 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
          const payload = {
             activity_id: newActivityId,
-            date: todayStr, // Keep assignment date
+            
             start_time: null, // Clear start time, waiting for them to start, use NULL not empty string
-            day: weekdayStr,
+           
             status: 'Assigned', // Changed from 'Started'
             submitted_by: username,
             
             // Copy details from the currently active report to provide context
             damage_type: activeReport.damage_type,
             
-            start_latitude: activeReport.start_latitude,
-            start_longitude: activeReport.start_longitude,
-            start_gmap_link: activeReport.start_gmap_link,
+           
 
             // Also copy end location if available, though usually this is for them to fill
             // Validated requirement: "copy the report" so context is preserved.
