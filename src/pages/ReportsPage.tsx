@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus, Play, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
@@ -908,9 +908,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 interface ListItemProps {
   report: Report;
   onClick: MouseEventHandler<HTMLDivElement>;
+  childrenReports?: Report[];
+  onChildClick?: (r: Report) => void;
 }
 
-const ReportListItem = ({ report, onClick }: ListItemProps) => {
+const ReportListItem = ({ report, onClick, childrenReports = [], onChildClick }: ListItemProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   const statusColor = report.status === 'Approved'
     ? 'bg-green-500 text-white'
     : report.status === 'Rejected'
@@ -918,37 +922,124 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
     : 'bg-yellow-500 text-gray-900';
 
   return (
-    <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer 
-                    hover:shadow-2xl hover:border-indigo-400 transition duration-300 
-                    transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4"
-      onClick={onClick}
-    >
-      {/* Left: ID, Date, Type */}
-      <div className="w-full">
-        <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
-          <MapPin className="w-5 h-5 mr-3 text-indigo-500" /> 
-          {report.activity_id}
-        </h3>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
-          <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
-        </p>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
-           Submitted by: <span className="font-medium">{report.submitted_by}</span>
-        </p>
+    <div className="flex flex-col space-y-2">
+      <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer 
+                      hover:shadow-2xl hover:border-indigo-400 transition duration-300 
+                      transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 relative"
+        onClick={onClick}
+      >
+        {/* Left: ID, Date, Type */}
+        <div className="w-full">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
+              <MapPin className="w-5 h-5 mr-3 text-indigo-500" /> 
+              {report.activity_id}
+            </h3>
+            {childrenReports.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                className="p-1 rounded-full hover:bg-gray-100 transition"
+                title={`${childrenReports.length} related reports`}
+              >
+                {isOpen ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 ml-8 mt-1">
+            <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
+          </p>
+          <p className="text-sm text-gray-500 ml-8 mt-1">
+             Submitted by: <span className="font-medium">{report.submitted_by}</span>
+          </p>
+        </div>
+
+        {/* Right: Duration and Status */}
+        <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
+          <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
+            <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
+            {report.duration} hours
+          </p>
+          <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
+            {report.status}
+          </span>
+        </div>
       </div>
 
-      {/* Right: Duration and Status */}
-      <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
-        <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
-          <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
-          {report.duration} hours
-        </p>
-        <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
-          {report.status}
-        </span>
-      </div>
+      {/* Children Reports Accordion */}
+      {isOpen && childrenReports.length > 0 && (
+        <div className="pl-6 sm:pl-10 space-y-2 border-l-2 border-indigo-100 ml-4">
+           {childrenReports.map(child => (
+             <ReportListItem 
+                key={child.id} 
+                report={child} 
+                onClick={() => onChildClick && onChildClick(child)} 
+             /> 
+           ))}
+        </div>
+      )}
     </div>
   );
+};
+
+// ====================================================================
+// --- GROUPING HELPERS ---
+// ====================================================================
+
+interface ReportGroup {
+  parent: Report;
+  children: Report[];
+}
+
+const groupReports = (reports: Report[]): ReportGroup[] => {
+  const groups: { [baseId: string]: Report[] } = {};
+  
+  reports.forEach(r => {
+    // Logic: Base ID is the part before the first hyphen? 
+    // Actually, "1234" is base. "1234-1" is child.
+    // Base ID of "1234" is "1234".
+    // Base ID of "1234-1" is "1234".
+    // We assume activity_id format is "BASE" or "BASE-SUFFIX".
+    const baseId = r.activity_id.split('-')[0];
+    if (!groups[baseId]) groups[baseId] = [];
+    groups[baseId].push(r);
+  });
+
+  const reportGroups: ReportGroup[] = [];
+  
+  Object.keys(groups).forEach(baseId => {
+    const list = groups[baseId];
+    // Find parent: exact match to baseId?
+    const parentIndex = list.findIndex(r => r.activity_id === baseId);
+    let parent: Report;
+    let children: Report[] = [];
+
+    if (parentIndex !== -1) {
+      parent = list[parentIndex];
+      children = list.filter((_, idx) => idx !== parentIndex);
+    } else {
+      // No exact parent match? (Maybe only 1234-1 exists).
+      // Treat the first one as parent (or grouped under virtual parent? No report must be real).
+      // Let's take the one with shortest ID? or just the first one.
+      // Sort by ID length then value.
+      list.sort((a, b) => a.activity_id.length - b.activity_id.length || a.activity_id.localeCompare(b.activity_id));
+      parent = list[0];
+      children = list.slice(1);
+    }
+    
+    // Sort children
+    children.sort((a, b) => a.activity_id.localeCompare(b.activity_id));
+    
+    reportGroups.push({ parent, children });
+  });
+
+  // Sort groups by parent date desc (or created_at)
+  reportGroups.sort((a, b) => new Date(b.parent.created_at).getTime() - new Date(a.parent.created_at).getTime());
+
+  return reportGroups;
+};
+
+const paginateGroups = (groups: ReportGroup[], page: number, limit: number) => {
+  return groups.slice((page - 1) * limit, page * limit);
 };
 
 // ====================================================================
@@ -1023,44 +1114,9 @@ export default function ReportsListPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data: Report[] = await res.json();
       
-      // 2. Group by activity_id -> picking the "most relevant" one for the list view
-      // We want to display ONE card per activity_id.
-      // Logic: If any report in the group is 'Pending', show as 'Pending'.
-      // If all are 'Approved', show 'Approved'. etc.
-      
-      const grouped: { [key: string]: Report[] } = {};
-      data.forEach(r => {
-        if (!grouped[r.activity_id]) grouped[r.activity_id] = [];
-        grouped[r.activity_id].push(r);
-      });
-
-      const uniqueActivityReports: Report[] = [];
-
-      Object.keys(grouped).forEach(actId => {
-          const group = grouped[actId];
-          // Determine "representative" report for list view
-          // Priority: Pending > Started > Approved > Rejected (or similar?)
-          // Actually, let's just pick the latest one, BUT override status if any is Pending
-          
-          const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
-          const hasStarted = group.some(r => r.status === 'Started');
-          
-          
-          // Let's use the layout of the latest report for details (date, damage type etc)
-          // But status should reflect if there is 'work to do' (Pending)
-          
-          const latest = group[0]; // Assuming sorted by desc
-          
-          let displayStatus = latest.status;
-          if (hasPending) displayStatus = 'Pending';
-          else if (hasStarted) displayStatus = 'Ongoing'; // Map Started -> Ongoing tab
-          else if (group.every(r => r.status === 'Approved')) displayStatus = 'Approved';
-          else if (group.every(r => r.status === 'Rejected')) displayStatus = 'Rejected';
-          
-          uniqueActivityReports.push({ ...latest, status: displayStatus });
-      });
-
-      setReports(uniqueActivityReports);
+      // Removed unique grouping logic to allow all reports (including suffixed ones) to be loaded.
+      // Grouping will be handled at the display level.
+      setReports(data);
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch reports");
@@ -1111,8 +1167,8 @@ export default function ReportsListPage() {
     setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
   };
 
-  const startedReports = reports.filter(r => r.status === 'Ongoing');
-  const pendingReports = reports.filter(r => r.status === 'Pending');
+  const startedReports = reports.filter(r => r.status === 'Ongoing' || r.status === 'Started' || r.status === 'Assigned');
+  const pendingReports = reports.filter(r => r.status === 'Pending' || r.status === 'Processing');
   const approvedReports = reports.filter(r => r.status === 'Approved');
   const rejectedReports = reports.filter(r => r.status === 'Rejected');
 
@@ -1129,26 +1185,8 @@ export default function ReportsListPage() {
   useEffect(() => { setPageApproved(1); }, [approvedReports.length]);
   useEffect(() => { setPageRejected(1); }, [rejectedReports.length]);
 
-  // Paginated slices
-  const startedPaginated = startedReports.slice(
-    (pageStarted - 1) * itemsPerPage,
-    pageStarted * itemsPerPage
-  );
-
-  const pendingPaginated = pendingReports.slice(
-    (pagePending - 1) * itemsPerPage,
-    pagePending * itemsPerPage
-  );
-
-  const approvedPaginated = approvedReports.slice(
-    (pageApproved - 1) * itemsPerPage,
-    pageApproved * itemsPerPage
-  );
-
-  const rejectedPaginated = rejectedReports.slice(
-    (pageRejected - 1) * itemsPerPage,
-    pageRejected * itemsPerPage
-  );
+  // Paginated slices (Now handled dynamically via helpers in render to support grouping)
+  // Removed old flat pagination variables to prevent unused warnings.
 
   /* CSV Export Function */
   const exportToCSV = (data: Report[], filename: string) => {
@@ -1300,16 +1338,32 @@ export default function ReportsListPage() {
             <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
               
               {activeTab === 'Ongoing' && (
-                <Section title="Ongoing Activity" color="#f59e0b" count={startedReports.length}>
-                  {startedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pageStarted} total={startedReports.length} itemsPerPage={itemsPerPage} onChange={setPageStarted} />
+                <Section title="Ongoing Activity" color="#f59e0b" count={groupReports(startedReports).length}>
+                  {paginateGroups(groupReports(startedReports), pageStarted, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pageStarted} total={groupReports(startedReports).length} itemsPerPage={itemsPerPage} onChange={setPageStarted} />
                 </Section>
               )}
 
               {activeTab === 'Pending' && (
-                <Section title="Pending Review" color="#f59e0b" count={pendingReports.length}>
-                  {pendingPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pagePending} total={pendingReports.length} itemsPerPage={itemsPerPage} onChange={setPagePending} />
+                <Section title="Pending Review" color="#f59e0b" count={groupReports(pendingReports).length}>
+                  {paginateGroups(groupReports(pendingReports), pagePending, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pagePending} total={groupReports(pendingReports).length} itemsPerPage={itemsPerPage} onChange={setPagePending} />
                 </Section>
               )}
 
@@ -1317,7 +1371,7 @@ export default function ReportsListPage() {
                 <Section
                   title="Approved Reports"
                   color="#10b981"
-                  count={approvedReports.length}
+                  count={groupReports(approvedReports).length}
                   onExport={() => {
                     const now = new Date();
                     const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
@@ -1325,15 +1379,31 @@ export default function ReportsListPage() {
                     exportToCSV(approvedReports, `approved_reports_${todayStr}.csv`);
                   }}
                 >
-                  {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
+                  {paginateGroups(groupReports(approvedReports), pageApproved, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pageApproved} total={groupReports(approvedReports).length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
                 </Section>
               )}
 
               {activeTab === 'Rejected' && (
-                 <Section title="Rejected Reports" color="#ef4444" count={rejectedReports.length}>
-                   {rejectedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                   <PaginationPills page={pageRejected} total={rejectedReports.length} itemsPerPage={itemsPerPage} onChange={setPageRejected} />
+                 <Section title="Rejected Reports" color="#ef4444" count={groupReports(rejectedReports).length}>
+                   {paginateGroups(groupReports(rejectedReports), pageRejected, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                   ))}
+                   <PaginationPills page={pageRejected} total={groupReports(rejectedReports).length} itemsPerPage={itemsPerPage} onChange={setPageRejected} />
                  </Section>
                )}
             </div>

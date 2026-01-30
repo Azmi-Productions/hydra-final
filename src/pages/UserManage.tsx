@@ -28,6 +28,13 @@ const getRoleBadgeClass = (role: string) => {
   }
 };
 
+// Helper: Get current username from cookie
+const getCookieUsername = () => {
+    const match = document.cookie.match(new RegExp('(^| )username=([^;]+)'));
+    if (match) return match[2];
+    return null;
+};
+
 // --- Sub-Component for Mobile (Card View) ---
 interface UserCardListProps {
   users: User[];
@@ -46,13 +53,15 @@ const UserCardList: React.FC<UserCardListProps> = ({ users, roles, roleUpdatingI
             <p className="text-xs text-slate-500 flex items-center gap-1"><Fingerprint className="w-3 h-3" /> User ID</p>
             <p className="text-lg font-bold text-slate-800 font-mono">{user.id}</p>
           </div>
-          <button
-            onClick={() => deleteUser(user.id)}
-            className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150"
-            title="Delete User"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
+          {user.username !== getCookieUsername() && (
+            <button
+              onClick={() => deleteUser(user.id)}
+              className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150"
+              title="Delete User"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
         </div>
         
         <div className="mb-3">
@@ -140,13 +149,15 @@ const UserTable: React.FC<UserCardListProps & { loading: boolean }> = ({ users, 
                 {new Date(user.created_at).toLocaleString()}
               </td>
               <td className="px-4 py-3 text-right text-sm font-medium">
-                <button
-                  onClick={() => deleteUser(user.id)}
-                  className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150"
-                  title="Delete User"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                {user.username !== getCookieUsername() && (
+                  <button
+                    onClick={() => deleteUser(user.id)}
+                    className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150"
+                    title="Delete User"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </td>
             </tr>
           ))
@@ -216,6 +227,15 @@ export default function UserManagementPage() {
   };
 
   const deleteUser = async (id: number) => {
+    // Prevent self-deletion
+    const userToDelete = users.find(u => u.id === id);
+    const currentUsername = getCookieUsername();
+    
+    if (userToDelete?.username === currentUsername) {
+       toast.error("You cannot delete your own account while signed in.");
+       return;
+    }
+
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE_NAME}?id=eq.${id}`, {
@@ -262,12 +282,19 @@ export default function UserManagementPage() {
       <div className=" mx-auto p-4 lg:p-10">
         
 <header className="mb-12  pt-2 pb-4 border-b-2 border-gray-300">
-          <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
-            User Management Console
-          </h1>
-          <p className="text-gray-500 mt-2 italic text-lg">
-            Manage user accounts, roles, and access permissions.
-          </p>
+          <div className="flex justify-between items-end">
+            <div>
+              <h1 className="text-2xl md:text-2xl font-extrabold text-gray-900 tracking-tight">
+                User Management Console
+              </h1>
+              <p className="text-gray-500 mt-2 italic text-lg">
+                Manage user accounts, roles, and access permissions.
+              </p>
+            </div>
+            <div className="text-right text-sm text-gray-400">
+               Logged in as: <span className="font-bold text-gray-600">{getCookieUsername() || "Unknown"}</span>
+            </div>
+          </div>
         </header>
         {/* Add User Card */}
         <div className="bg-white rounded-xl shadow-2xl p-6 lg:p-8 mb-12 border border-blue-50/50">
