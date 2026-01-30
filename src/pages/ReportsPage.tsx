@@ -224,7 +224,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         // Use Malaysia time zone
         const now = new Date();
         const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
-        const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+
         const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
         const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
