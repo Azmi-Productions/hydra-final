@@ -499,79 +499,101 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
 
   // WAIT FOR LOCATION
   setIsStarting(true);
-  let lat = null;
-  let lng = null;
-  let link = null;
 
   try {
-    const pos = await getLocationAsync();
-    lat = pos.lat;
-    lng = pos.lng;
-    link = `https://maps.google.com/?q=${lat},${lng}`;
-
-    setLatitude(lat);
-    setLongitude(lng);
-    setGmapLink(link);
-  } catch (e) {
-    console.error(e);
-  }
-
-  // Use Malaysia time zone
-  const now = new Date();
-  const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
-  const timeStr = malaysiaTime.toTimeString().slice(0, 5);
-  const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
-  const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
-
-  setStartTime(timeStr);
-  setDate(todayStr);
-  setDay(weekdayStr);
-
-  const payload = {
-    activity_id: activityId,
-    date: todayStr,
-    day: weekdayStr,
-    start_time: timeStr,
-    start_latitude: lat,
-    start_longitude: lng,
-    start_gmap_link: link,
-    status: "Started",
-    submitted_by: username,
-  };
-
-  try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
-        method: "POST",
+    // 1. Check if Activity ID already exists
+    const checkRes = await fetch(
+      `${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${activityId}&select=activity_id`,
+      {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           "apikey": supabaseKey,
-          "Authorization": `Bearer ${supabaseKey}`,
-          "Prefer": "return=representation",
-        },
-        body: JSON.stringify(payload),
-      });
+          "Authorization": `Bearer ${supabaseKey}`
+        }
+      }
+    );
 
-      if (!res.ok) {
-        const err = await res.json();
-        console.error(err);
-        toast.error(`Start Failed: ${err.message || err.details || "Unknown error"}`);
+    if (checkRes.ok) {
+      const existingData = await checkRes.json();
+      if (existingData.length > 0) {
+        toast.error(`Activity ID ${activityId} already exists. Please use another activity ID or select it from the list.`);
+        setIsStarting(false);
         return;
       }
+    }
 
-      const data = await res.json();
-      toast.success(`Activity ${activityId} started at ${timeStr}`);
-      fetchStartedActivities();
-      
-      if (data && data.length > 0) {
-        selectActivity(data[0]);
-      }
+    // 2. WAIT FOR LOCATION (Your existing logic)
+    let lat = null;
+    let lng = null;
+    let link = null;
+
+    try {
+      const pos = await getLocationAsync();
+      lat = pos.lat;
+      lng = pos.lng;
+      link = `https://maps.google.com/?q=${lat},${lng}`;
+      setLatitude(lat);
+      setLongitude(lng);
+      setGmapLink(link);
+    } catch (e) {
+      console.error("Location access denied or failed", e);
+    }
+
+    // 3. Prepare Time and Date
+    const now = new Date();
+    const malaysiaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
+    const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+    const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`;
+    const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+
+    setDate(todayStr);
+    setDay(weekdayStr);
+    setStartTime(timeStr);
+
+    const payload = {
+      activity_id: activityId,
+      date: todayStr,
+      day: weekdayStr,
+      start_time: timeStr,
+      start_latitude: lat,
+      start_longitude: lng,
+      start_gmap_link: link,
+      status: "Started",
+      submitted_by: username,
+    };
+
+    // 4. Create the activity
+    const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Prefer": "return=representation",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      toast.error(`Start Failed: ${err.message || "Unknown error"}`);
+      return;
+    }
+
+    const data = await res.json();
+    toast.success(`Activity ${activityId} started!`);
+    fetchStartedActivities();
+    
+    if (data && data.length > 0) {
+      selectActivity(data[0]);
+    }
   } catch (err) {
-      console.error(err);
-      toast.error("An error occurred while starting activity.");
+    console.error(err);
+    toast.error("An error occurred while checking activity existence.");
   } finally {
-      setIsStarting(false);
+    setIsStarting(false);
   }
-  };
+};
 
   const startAssignedActivity = async (e: React.MouseEvent, activity: any) => {
       e.stopPropagation();

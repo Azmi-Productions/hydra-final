@@ -1212,6 +1212,14 @@ export default function ReportsListPage() {
       const escaped = stringValue.replace(/"/g, '""'); 
       return `"${escaped}"`;
     };
+    const formatDimension = (dim: Dimensions | null | undefined) => {
+      if (!dim) return "0";
+      // Convert the string properties from the Dimensions interface
+      const l = parseFloat(dim.length) || 0;
+      const w = parseFloat(dim.width) || 0;
+      const d = parseFloat(dim.depth) || 1; // Use 1 as multiplier if depth is empty
+      return (l * w * d).toFixed(2); 
+    };
 
     for (const row of data) {
       const values = [
@@ -1225,11 +1233,11 @@ export default function ReportsListPage() {
         escapeCSV(row.damage_type),
         escapeCSV(row.equipment_used),
         escapeCSV(row.manpower_involved),
-        escapeCSV(row.excavation || 0),
-        escapeCSV(row.sand || 0),
-        escapeCSV(row.aggregate || 0),
-        escapeCSV(row.premix || 0),
-        escapeCSV(row.cement || 0),
+      escapeCSV(formatDimension(row.excavation)),
+        escapeCSV(formatDimension(row.sand)),
+        escapeCSV(formatDimension(row.aggregate)),
+        escapeCSV(formatDimension(row.premix)),
+        escapeCSV(formatDimension(row.cement)),
         escapeCSV(row.pipe_usage || 0),
         escapeCSV(row.fittings),
         escapeCSV(row.remarks), 
