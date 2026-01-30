@@ -2,6 +2,7 @@ import { useEffect, useState, MouseEventHandler } from "react";
 import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
+import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
 // --- Supabase REST API Config from .env ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -17,8 +18,8 @@ interface Report {
   id: number;
   activity_id: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  start_time: string | null;
+  end_time: string | null;
   day: string;
   duration: number; // Required number
   damage_type: string;
@@ -26,14 +27,15 @@ interface Report {
   manpower_involved: string;
   
   // These optional fields must allow `null` from the database and during save.
-  excavation?: number | null;
-  sand?: number | null;
-  aggregate?: number | null;
-  premix?: number | null;
-  cement?: number | null;
+  // Changed to 'any' to support Dimensions object { length, width, depth } or legacy numbers
+  excavation?: any;
+  sand?: any;
+  aggregate?: any;
+  premix?: any;
+  cement?: any;
   pipe_usage?: number | null;
   
-  fittings?: string | null;
+  fittings?: any; // Changed to any to support string[] or string
   remarks?: string | null;
   
   start_latitude?: number | null;
@@ -107,17 +109,64 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   const [showAddSupervisor, setShowAddSupervisor] = useState(false);
   const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
 
+  // Helper to parse potential string or object dimensions (Copied from ReportSubmission)
+  const parseDimensions = (val: any): Dimensions | null => {
+      if (!val) return null;
+      if (typeof val === 'object') {
+          return {
+              length: val.length || "",
+              width: val.width || "",
+              depth: val.depth || ""
+          };
+      }
+      if (typeof val === 'string') {
+            // Try to parse JSON first
+            try {
+              const parsed = JSON.parse(val);
+              if(typeof parsed === 'object') {
+                    return {
+                      length: parsed.length || "",
+                      width: parsed.width || "",
+                      depth: parsed.depth || ""
+                    };
+              }
+            } catch(e) { /* Ignore */ }
+
+          // Fallback to "LxWxD" string parsing (legacy)
+          const parts = val.toLowerCase().split('x');
+          return {
+              length: parts[0] || "",
+              width: parts[1] || "",
+              depth: parts[2] || ""
+          };
+      }
+      // If it's a number (legacy data), maybe treat as length? or just return null?
+      // Let's assume null for strict "L x W x D" requirement, or put in length if needed.
+      return null; 
+  };
+
+
   // Use the currently active report for display/editing
   const activeReport = reports[activeReportIdx] || report;
 
   const [editableReport, setEditableReport] = useState<Report>({ ...activeReport });
   const [saving, setSaving] = useState(false);
 
-  // --- Fetch all reports for this activity ID ---
+  // --- Fetch all reports for this activity ID (grouped by grouping logic) ---
   const fetchActivityReports = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${supabaseUrl}/rest/v1/reports?activity_id=eq.${report.activity_id}&select=*`, { headers });
+      // Logic: If current ID is "12345-1", base is "12345". If "12345", base is "12345".
+      const currentIdStr = report.activity_id.toString();
+      const baseId = currentIdStr.includes('-') ? currentIdStr.split('-')[0] : currentIdStr;
+
+      // Query: specific ID OR ID like baseId-%
+      // Supabase filter syntax for OR: or=(col.eq.val,col.like.val)
+      // Note: We used * for wildcard before? No, PostgREST uses % (SQL standard). 
+      // But in URL params, % must be encoded as %25.
+      const query = `or=(activity_id.eq.${baseId},activity_id.like.${baseId}-%25)`;
+
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?${query}&select=*&order=id.asc`, { headers });
       if (!res.ok) throw new Error("Failed to fetch activity reports");
       const data: Report[] = await res.json();
       setReports(data);
@@ -154,7 +203,18 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
   useEffect(() => {
     // When switching tabs, update the editable state
-    setEditableReport({ ...reports[activeReportIdx] });
+    // We need to ensure complex fields (dimensions) are parsed correctly for the UI
+    const current = reports[activeReportIdx] || report;
+    setEditableReport({ 
+        ...current,
+        excavation: parseDimensions(current.excavation),
+        sand: parseDimensions(current.sand),
+        aggregate: parseDimensions(current.aggregate),
+        premix: parseDimensions(current.premix),
+        cement: parseDimensions(current.cement),
+        // Fittings might be string list or string
+        fittings: Array.isArray(current.fittings) ? current.fittings.join(', ') : (current.fittings || "")
+    });
   }, [activeReportIdx, reports]);
 
   const handleAddSupervisor = async (username: string) => {
@@ -168,17 +228,50 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
         const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
-        const payload = {
-           activity_id: report.activity_id,
-           date: todayStr,
-           start_time: timeStr,
-           day: weekdayStr,
-           status: 'Started',
-           submitted_by: username,
-           // Copy basic location/timing from original if available, or leave blank?
-           // Let's just init minimal
-           duration: 0
-        };
+  
+         // Logic to calculate next suffix
+         // Get base ID
+         const currentIdStr = report.activity_id.toString();
+         const baseId = currentIdStr.includes('-') ? currentIdStr.split('-')[0] : currentIdStr;
+         
+         // Find highest suffix in existing reports for this base
+         let maxSuffix = 0;
+         reports.forEach(r => {
+             const rId = r.activity_id.toString();
+             if (rId.startsWith(baseId + '-')) {
+                 const suffixPart = rId.split(baseId + '-')[1];
+                 const suffix = parseInt(suffixPart, 10);
+                 if (!isNaN(suffix) && suffix > maxSuffix) {
+                     maxSuffix = suffix;
+                 }
+             }
+         });
+         
+         const newActivityId = `${baseId}-${maxSuffix + 1}`;
+
+         const payload = {
+            activity_id: newActivityId,
+            date: todayStr, // Keep assignment date
+            start_time: null, // Clear start time, waiting for them to start, use NULL not empty string
+            day: weekdayStr,
+            status: 'Assigned', // Changed from 'Started'
+            submitted_by: username,
+            
+            // Copy details from the currently active report to provide context
+            damage_type: activeReport.damage_type,
+            
+            start_latitude: activeReport.start_latitude,
+            start_longitude: activeReport.start_longitude,
+            start_gmap_link: activeReport.start_gmap_link,
+
+            // Also copy end location if available, though usually this is for them to fill
+            // Validated requirement: "copy the report" so context is preserved.
+            end_latitude: activeReport.end_latitude,
+            end_longitude: activeReport.end_longitude,
+            end_gmap_link: activeReport.end_gmap_link,
+
+            duration: 0
+         };
 
         const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
             method: 'POST', 
@@ -200,14 +293,14 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
      }
   };
 
-  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
+
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
 
-  const handleChange = (field: keyof Report, value: string | number) => {
-    let finalValue: string | number | null | undefined = value;
+  const handleChange = (field: keyof Report, value: any) => {
+    let finalValue: any = value;
     
-    // Logic for optional number fields
-    if (typeof value === 'string' && optionalNullableNumberFields.includes(field)) {
+    // Logic for optional number fields (only pipe_usage remains a simple number)
+    if (field === 'pipe_usage' && typeof value === 'string') {
       const numValue = Number(value);
       finalValue = value.trim() === '' || isNaN(numValue) ? undefined : numValue;
     }
@@ -218,6 +311,10 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
     }
     
     setEditableReport(prev => ({ ...prev, [field]: finalValue } as any));
+  };
+
+  const handleDimensionChange = (field: keyof Report, val: Dimensions) => {
+      setEditableReport(prev => ({ ...prev, [field]: val }));
   };
 
 
@@ -280,8 +377,22 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
       const updates: { [key: string]: any } = {};
 
       (Object.keys(editableReport) as (keyof Report)[]).forEach(key => {
-        if (editableReport[key] !== currentReport[key]) {
-          updates[key] = editableReport[key] === undefined ? null : editableReport[key];
+        // Special check for fittings string -> array conversion if needed
+        if (key === 'fittings' && typeof editableReport.fittings === 'string') {
+             // If original was array, we need to compare properly? 
+             // Simplest is to just split and save if it changed.
+             // But here we just compare standard equality which might fail for objects
+        }
+
+        if (JSON.stringify(editableReport[key]) !== JSON.stringify(currentReport[key])) {
+             let val = editableReport[key];
+             
+             // Convert fittings string back to array if it's a string
+             if (key === 'fittings' && typeof val === 'string') {
+                 val = val.split(',').map(s => s.trim()).filter(s => s);
+             }
+
+             updates[key] = val === undefined ? null : val;
         }
       });
       
@@ -396,8 +507,8 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                         >
                             {r.submitted_by} 
                             <span className={`ml-2 text-xs opacity-75 ${
-                                r.status === 'Approved' ? 'text-green-200' :
-                                r.status === 'Rejected' ? 'text-red-200' : ''
+                                r.status === 'Approved' ? (i === activeReportIdx ? 'text-green-300' : 'text-green-600') :
+                                r.status === 'Rejected' ? (i === activeReportIdx ? 'text-red-300' : 'text-red-600') : ''
                             }`}>({r.status})</span>
                         </button>
                         <button
@@ -547,35 +658,57 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
           {/* Materials */}
           <section className="space-y-4 pt-4">
             <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className={labelStyle}>Excavation (m³)</label>
-                <input type="number" value={editableReport.excavation ?? ""} onChange={(e) => handleChange("excavation", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Sand (m³)</label>
-                <input type="number" value={editableReport.sand ?? ""} onChange={(e) => handleChange("sand", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Aggregate (m³)</label>
-                <input type="number" value={editableReport.aggregate ?? ""} onChange={(e) => handleChange("aggregate", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Premix (kg)</label>
-                <input type="number" value={editableReport.premix ?? ""} onChange={(e) => handleChange("premix", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Cement (kg)</label>
-                <input type="number" value={editableReport.cement ?? ""} onChange={(e) => handleChange("cement", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Pipe Usage (m)</label>
-                <input type="number" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelStyle}>Fittings</label>
-                <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)} className={inputStyle} />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Row 1 */}
+                <DimensionInput 
+                    label="Excavation (m³)" 
+                    value={editableReport.excavation} 
+                    onChange={(val) => handleDimensionChange('excavation', val)} 
+                />
+                <DimensionInput 
+                    label="Sand (m³)" 
+                    value={editableReport.sand} 
+                    onChange={(val) => handleDimensionChange('sand', val)} 
+                />
+                
+                {/* Row 2 */}
+                <DimensionInput 
+                    label="Aggregate (m³)" 
+                    value={editableReport.aggregate} 
+                    onChange={(val) => handleDimensionChange('aggregate', val)} 
+                />
+                <DimensionInput 
+                    label="Premix (kg)" 
+                    value={editableReport.premix} 
+                    onChange={(val) => handleDimensionChange('premix', val)}
+                    showDepth={false} 
+                />
+
+                {/* Row 3 */}
+                <DimensionInput 
+                    label="Cement (kg)" 
+                    value={editableReport.cement} 
+                    onChange={(val) => handleDimensionChange('cement', val)} 
+                    showDepth={false} 
+                />
+
+                {/* Row 4 */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className={labelStyle}>Pipe Usage (m)</label>
+                        <input type="number" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className={labelStyle}>Fittings</label>
+                        <input 
+                            type="text" 
+                            value={typeof editableReport.fittings === 'string' ? editableReport.fittings : (Array.isArray(editableReport.fittings) ? editableReport.fittings.join(', ') : "")} 
+                            onChange={(e) => handleChange("fittings", e.target.value)} 
+                            className={inputStyle} 
+                            placeholder="Comma separated"
+                        />
+                    </div>
+                </div>
             </div>
           </section>
 
