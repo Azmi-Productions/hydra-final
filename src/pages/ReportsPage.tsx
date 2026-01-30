@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus,Play} from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Check, XCircle, Edit3, Loader2, Clock, Download, UserPlus, Play, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from "../utils/toast";
 import { supabase } from "../supabase";
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
@@ -18,8 +18,8 @@ interface Report {
   id: number;
   activity_id: string;
   date: string;
-  start_time: string;
-  end_time: string;
+  start_time: string | null;
+  end_time: string | null;
   day: string;
   duration: number; // Required number
   damage_type: string;
@@ -27,14 +27,15 @@ interface Report {
   manpower_involved: string;
   
   // These optional fields must allow `null` from the database and during save.
-    excavation?: Dimensions | null;
-  sand?: Dimensions | null;
-  aggregate?: Dimensions | null;
-  premix?: Dimensions | null;
-  cement?: Dimensions | null;
+  // Changed to 'any' to support Dimensions object { length, width, depth } or legacy numbers
+  excavation?: any;
+  sand?: any;
+  aggregate?: any;
+  premix?: any;
+  cement?: any;
   pipe_usage?: number | null;
   
-  fittings?: string | null;
+  fittings?: any; // Changed to any to support string[] or string
   remarks?: string | null;
   
   start_latitude?: number | null;
@@ -108,36 +109,80 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
   const [showAddSupervisor, setShowAddSupervisor] = useState(false);
   const [activeTab, setActiveTab] = useState<'Report' | 'Maintenance' | 'Premix'>('Report');
 
+  // Helper to parse potential string or object dimensions (Copied from ReportSubmission)
+  const parseDimensions = (val: any): Dimensions | null => {
+      if (!val) return null;
+      if (typeof val === 'object') {
+          return {
+              length: val.length || "",
+              width: val.width || "",
+              depth: val.depth || ""
+          };
+      }
+      if (typeof val === 'string') {
+            // Try to parse JSON first
+            try {
+              const parsed = JSON.parse(val);
+              if(typeof parsed === 'object') {
+                    return {
+                      length: parsed.length || "",
+                      width: parsed.width || "",
+                      depth: parsed.depth || ""
+                    };
+              }
+            } catch(e) { /* Ignore */ }
+
+          // Fallback to "LxWxD" string parsing (legacy)
+          const parts = val.toLowerCase().split('x');
+          return {
+              length: parts[0] || "",
+              width: parts[1] || "",
+              depth: parts[2] || ""
+          };
+      }
+      // If it's a number (legacy data), maybe treat as length? or just return null?
+      // Let's assume null for strict "L x W x D" requirement, or put in length if needed.
+      return null; 
+  };
+
+
   // Use the currently active report for display/editing
   const activeReport = reports[activeReportIdx] || report;
 
   const [editableReport, setEditableReport] = useState<Report>({ ...activeReport });
   const [saving, setSaving] = useState(false);
 
-  // --- Fetch all reports for this activity ID ---
- const fetchActivityReports = async () => {
-  setLoading(true);
-  try {
-    // Extract base ID to find all related sub-reports
-    const baseId = report.activity_id.split('-')[0];
-    
-    // Use 'ilike' with a wildcard to find '1232', '1232-1', '1232-2', etc.
-    const res = await fetch(`${supabaseUrl}/rest/v1/reports?activity_id=ilike.${baseId}*&select=*&order=activity_id.asc`, { headers });
-    
-    if (!res.ok) throw new Error("Failed to fetch activity reports");
-    const data: Report[] = await res.json();
-    setReports(data);
-     
-    const currentId = activeReport.id; 
-    const newIdx = data.findIndex(r => r.id === currentId);
-    if (newIdx !== -1) setActiveReportIdx(newIdx);
+  // --- Fetch all reports for this activity ID (grouped by grouping logic) ---
+  const fetchActivityReports = async () => {
+    setLoading(true);
+    try {
+      // Logic: If current ID is "12345-1", base is "12345". If "12345", base is "12345".
+      const currentIdStr = report.activity_id.toString();
+      const baseId = currentIdStr.includes('-') ? currentIdStr.split('-')[0] : currentIdStr;
 
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to load related reports.");
-  }
-  setLoading(false);
-};
+      // Query: specific ID OR ID like baseId-%
+      // Supabase filter syntax for OR: or=(col.eq.val,col.like.val)
+      // Note: We used * for wildcard before? No, PostgREST uses % (SQL standard). 
+      // But in URL params, % must be encoded as %25.
+      const query = `or=(activity_id.eq.${baseId},activity_id.like.${baseId}-%25)`;
+
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?${query}&select=*&order=id.asc`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch activity reports");
+      const data: Report[] = await res.json();
+      setReports(data);
+       
+      // Reset editable to current active
+      // Find the one that matches the original passed 'report.id' if possible, or just stay at 0
+      const currentId = activeReport.id; 
+      const newIdx = data.findIndex(r => r.id === currentId);
+      if (newIdx !== -1) setActiveReportIdx(newIdx);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load all reports for this activity.");
+    }
+    setLoading(false);
+  };
 
   // --- Fetch Supervisors for Dropdown ---
   const fetchSupervisors = async () => {
@@ -158,84 +203,119 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
   useEffect(() => {
     // When switching tabs, update the editable state
-    setEditableReport({ ...reports[activeReportIdx] });
+    // We need to ensure complex fields (dimensions) are parsed correctly for the UI
+    const current = reports[activeReportIdx] || report;
+    setEditableReport({ 
+        ...current,
+        excavation: parseDimensions(current.excavation),
+        sand: parseDimensions(current.sand),
+        aggregate: parseDimensions(current.aggregate),
+        premix: parseDimensions(current.premix),
+        cement: parseDimensions(current.cement),
+        // Fittings might be string list or string
+        fittings: Array.isArray(current.fittings) ? current.fittings.join(', ') : (current.fittings || "")
+    });
   }, [activeReportIdx, reports]);
 
- const handleAddSupervisor = async (username: string) => {
-  if (!confirm(`Assign ${username} to this activity?`)) return;
-  setSaving(true);
-  try {
-    // Determine the base ID (e.g., '1232' from '1232' or '1232-1')
-    const baseId = report.activity_id.split('-')[0];
-    
-    // Count existing reports that start with this baseId to get the next suffix
-    const nextSuffix = reports.length; 
-    const newActivityId = `${baseId}-${nextSuffix}`;
+  const handleAddSupervisor = async (username: string) => {
+     if (!confirm(`Assign ${username} to this activity?`)) return;
+     setSaving(true);
+     try {
+        // Use Malaysia time zone
+        const now = new Date();
+        const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
 
-    const now = new Date();
-    const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
-    const timeStr = malaysiaTime.toTimeString().slice(0, 5);
-    const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`;
-    const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+        const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; // YYYY-MM-DD format
+        const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
 
-    // Only include essential starting fields to prevent duplicating old data
-    const payload = {
-      activity_id: newActivityId,
-      date: todayStr,
-      start_time: timeStr,
-      day: weekdayStr,
-      status: 'Started',
-      submitted_by: username,
-      duration: 0,
-      damage_type: '', // Carry over the category but not the photos/results
-      equipment_used: '',
-      manpower_involved: '',
-      photo_link: null, // Ensure photo links start empty
-      remarks: null
-    };
+  
+         // Logic to calculate next suffix
+         // Get base ID
+         const currentIdStr = report.activity_id.toString();
+         const baseId = currentIdStr.includes('-') ? currentIdStr.split('-')[0] : currentIdStr;
+         
+         // Find highest suffix in existing reports for this base
+         let maxSuffix = 0;
+         reports.forEach(r => {
+             const rId = r.activity_id.toString();
+             if (rId.startsWith(baseId + '-')) {
+                 const suffixPart = rId.split(baseId + '-')[1];
+                 const suffix = parseInt(suffixPart, 10);
+                 if (!isNaN(suffix) && suffix > maxSuffix) {
+                     maxSuffix = suffix;
+                 }
+             }
+         });
+         
+         const newActivityId = `${baseId}-${maxSuffix + 1}`;
 
-    const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
-        method: 'POST', 
-        headers: { ...headers, "Prefer": "return=representation" },
-        body: JSON.stringify(payload)
-    });
+         const payload = {
+            activity_id: newActivityId,
+            date: todayStr, // Keep assignment date
+            start_time: null, // Clear start time, waiting for them to start, use NULL not empty string
+            day: weekdayStr,
+            status: 'Assigned', // Changed from 'Started'
+            submitted_by: username,
+            
+            // Copy details from the currently active report to provide context
+            damage_type: activeReport.damage_type,
+            
+            start_latitude: activeReport.start_latitude,
+            start_longitude: activeReport.start_longitude,
+            start_gmap_link: activeReport.start_gmap_link,
 
-    if (!res.ok) throw new Error("Failed to add supervisor");
+            // Also copy end location if available, though usually this is for them to fill
+            // Validated requirement: "copy the report" so context is preserved.
+            end_latitude: activeReport.end_latitude,
+            end_longitude: activeReport.end_longitude,
+            end_gmap_link: activeReport.end_gmap_link,
 
-    toast.success(`Supervisor ${username} assigned to ${newActivityId}`);
-    setShowAddSupervisor(false);
-    fetchActivityReports(); // Refresh the tab list
+            duration: 0
+         };
 
-  } catch(e) {
-    console.error(e);
-    toast.error("Failed to add supervisor.");
-  } finally {
-    setSaving(false);
-  }
-};
+        const res = await fetch(`${supabaseUrl}/rest/v1/reports`, { 
+            method: 'POST', 
+            headers: { ...headers, "Prefer": "return=representation" },
+            body: JSON.stringify(payload)
+        });
 
-  const optionalNullableNumberFields: (keyof Report)[] = ['excavation', 'sand', 'aggregate', 'premix', 'cement', 'pipe_usage', 'start_latitude', 'start_longitude','end_latitude', 'end_longitude'];
+        if (!res.ok) throw new Error("Failed to add supervisor");
+
+        toast.success(`Supervisor ${username} added!`);
+        setShowAddSupervisor(false);
+        fetchActivityReports(); // Reload tabs
+
+     } catch(e) {
+        console.error(e);
+        toast.error("Failed to add supervisor.");
+     } finally {
+        setSaving(false);
+     }
+  };
+
+
   const optionalNullableStringFields: (keyof Report)[] = ['fittings', 'remarks'];
 
-// 1. Update the type signature to include Dimensions | null
-const handleChange = (field: keyof Report, value: string | number | Dimensions | null) => {
-  let finalValue: any = value;
-  
-  // Logic for optional number fields (like pipe_usage)
-  if (typeof value === 'string' && optionalNullableNumberFields.includes(field)) {
-    const numValue = Number(value);
-    finalValue = value.trim() === '' || isNaN(numValue) ? null : numValue;
-  }
-  
-  // Logic for optional string fields (like fittings, remarks)
-  if (typeof value === 'string' && optionalNullableStringFields.includes(field)) {
-      finalValue = value.trim() === '' ? null : value;
-  }
+  const handleChange = (field: keyof Report, value: any) => {
+    let finalValue: any = value;
+    
+    // Logic for optional number fields (only pipe_usage remains a simple number)
+    if (field === 'pipe_usage' && typeof value === 'string') {
+      const numValue = Number(value);
+      finalValue = value.trim() === '' || isNaN(numValue) ? undefined : numValue;
+    }
+    
+    // Logic for optional string fields
+    if (typeof value === 'string' && optionalNullableStringFields.includes(field)) {
+        finalValue = value.trim() === '' ? undefined : value;
+    }
+    
+    setEditableReport(prev => ({ ...prev, [field]: finalValue } as any));
+  };
 
-  
-  
-  setEditableReport(prev => ({ ...prev, [field]: finalValue }));
-};
+  const handleDimensionChange = (field: keyof Report, val: Dimensions) => {
+      setEditableReport(prev => ({ ...prev, [field]: val }));
+  };
 
 
 
@@ -297,8 +377,22 @@ const handleChange = (field: keyof Report, value: string | number | Dimensions |
       const updates: { [key: string]: any } = {};
 
       (Object.keys(editableReport) as (keyof Report)[]).forEach(key => {
-        if (editableReport[key] !== currentReport[key]) {
-          updates[key] = editableReport[key] === undefined ? null : editableReport[key];
+        // Special check for fittings string -> array conversion if needed
+        if (key === 'fittings' && typeof editableReport.fittings === 'string') {
+             // If original was array, we need to compare properly? 
+             // Simplest is to just split and save if it changed.
+             // But here we just compare standard equality which might fail for objects
+        }
+
+        if (JSON.stringify(editableReport[key]) !== JSON.stringify(currentReport[key])) {
+             let val = editableReport[key];
+             
+             // Convert fittings string back to array if it's a string
+             if (key === 'fittings' && typeof val === 'string') {
+                 val = val.split(',').map(s => s.trim()).filter(s => s);
+             }
+
+             updates[key] = val === undefined ? null : val;
         }
       });
       
@@ -413,8 +507,8 @@ const handleChange = (field: keyof Report, value: string | number | Dimensions |
                         >
                             {r.submitted_by} 
                             <span className={`ml-2 text-xs opacity-75 ${
-                                r.status === 'Approved' ? 'text-green-200' :
-                                r.status === 'Rejected' ? 'text-red-200' : ''
+                                r.status === 'Approved' ? (i === activeReportIdx ? 'text-green-300' : 'text-green-600') :
+                                r.status === 'Rejected' ? (i === activeReportIdx ? 'text-red-300' : 'text-red-600') : ''
                             }`}>({r.status})</span>
                         </button>
                         <button
@@ -563,52 +657,60 @@ const handleChange = (field: keyof Report, value: string | number | Dimensions |
 
           {/* Materials */}
           <section className="space-y-4 pt-4">
-                    <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      <div className="col-span-2 sm:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <DimensionInput
-                              label="Excavation (m³)"
-                              value={editableReport.excavation || null}
-                              onChange={(val) => handleChange("excavation", val)}
-                             
-                          />
-                          <DimensionInput
-                              label="Sand (m³)"
-                              value={editableReport.sand || null}
-                              onChange={(val) => handleChange("sand", val)}
-                              
-                          />
-                          <DimensionInput
-                              label="Aggregate (m³)"
-                              value={editableReport.aggregate || null}
-                              onChange={(val) => handleChange("aggregate", val)}
-                             
-                          />
-                          <DimensionInput
-                              label="Premix (kg)"
-                              value={editableReport.premix || null}
-                              onChange={(val) => handleChange("premix", val)}
-                             
-                              showDepth={false}
-                          />
-                          <DimensionInput
-                              label="Cement (kg)"
-                              value={editableReport.cement || null}
-                              onChange={(val) => handleChange("cement", val)}
-                             
-                              showDepth={false}
-                          />
-                      </div>
-                       <div className="space-y-1">
+            <h3 className={sectionHeaderStyle}><Hash className={iconStyle} /> Materials Quantities</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Row 1 */}
+                <DimensionInput 
+                    label="Excavation (m³)" 
+                    value={editableReport.excavation} 
+                    onChange={(val) => handleDimensionChange('excavation', val)} 
+                />
+                <DimensionInput 
+                    label="Sand (m³)" 
+                    value={editableReport.sand} 
+                    onChange={(val) => handleDimensionChange('sand', val)} 
+                />
+                
+                {/* Row 2 */}
+                <DimensionInput 
+                    label="Aggregate (m³)" 
+                    value={editableReport.aggregate} 
+                    onChange={(val) => handleDimensionChange('aggregate', val)} 
+                />
+                <DimensionInput 
+                    label="Premix (kg)" 
+                    value={editableReport.premix} 
+                    onChange={(val) => handleDimensionChange('premix', val)}
+                    showDepth={false} 
+                />
+
+                {/* Row 3 */}
+                <DimensionInput 
+                    label="Cement (kg)" 
+                    value={editableReport.cement} 
+                    onChange={(val) => handleDimensionChange('cement', val)} 
+                    showDepth={false} 
+                />
+
+                {/* Row 4 */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
                         <label className={labelStyle}>Pipe Usage (m)</label>
-                        <input type="text" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
-                      </div>
-                      <div className="space-y-1">
-                        <label className={labelStyle}>Fittings</label>
-                        <input type="text" value={editableReport.fittings ?? ""} onChange={(e) => handleChange("fittings", e.target.value)}  className={inputStyle} />
-                      </div>
+                        <input type="number" value={editableReport.pipe_usage ?? ""} onChange={(e) => handleChange("pipe_usage", e.target.value)} className={inputStyle} />
                     </div>
-                  </section>
+                    <div className="space-y-1">
+                        <label className={labelStyle}>Fittings</label>
+                        <input 
+                            type="text" 
+                            value={typeof editableReport.fittings === 'string' ? editableReport.fittings : (Array.isArray(editableReport.fittings) ? editableReport.fittings.join(', ') : "")} 
+                            onChange={(e) => handleChange("fittings", e.target.value)} 
+                            className={inputStyle} 
+                            placeholder="Comma separated"
+                        />
+                    </div>
+                </div>
+            </div>
+          </section>
 
           <p className="text-xl text-gray-500  mt-1">
             Submitted by: <span className="font-medium">{report.submitted_by}</span>
@@ -806,9 +908,13 @@ const handleChange = (field: keyof Report, value: string | number | Dimensions |
 interface ListItemProps {
   report: Report;
   onClick: MouseEventHandler<HTMLDivElement>;
+  childrenReports?: Report[];
+  onChildClick?: (r: Report) => void;
 }
 
-const ReportListItem = ({ report, onClick }: ListItemProps) => {
+const ReportListItem = ({ report, onClick, childrenReports = [], onChildClick }: ListItemProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   const statusColor = report.status === 'Approved'
     ? 'bg-green-500 text-white'
     : report.status === 'Rejected'
@@ -816,37 +922,124 @@ const ReportListItem = ({ report, onClick }: ListItemProps) => {
     : 'bg-yellow-500 text-gray-900';
 
   return (
-    <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer 
-                    hover:shadow-2xl hover:border-indigo-400 transition duration-300 
-                    transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4"
-      onClick={onClick}
-    >
-      {/* Left: ID, Date, Type */}
-      <div className="w-full">
-        <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
-          <MapPin className="w-5 h-5 mr-3 text-indigo-500" /> 
-          {report.activity_id}
-        </h3>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
-          <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
-        </p>
-        <p className="text-sm text-gray-500 ml-8 mt-1">
-           Submitted by: <span className="font-medium">{report.submitted_by}</span>
-        </p>
+    <div className="flex flex-col space-y-2">
+      <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer 
+                      hover:shadow-2xl hover:border-indigo-400 transition duration-300 
+                      transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 relative"
+        onClick={onClick}
+      >
+        {/* Left: ID, Date, Type */}
+        <div className="w-full">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
+              <MapPin className="w-5 h-5 mr-3 text-indigo-500" /> 
+              {report.activity_id}
+            </h3>
+            {childrenReports.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                className="p-1 rounded-full hover:bg-gray-100 transition"
+                title={`${childrenReports.length} related reports`}
+              >
+                {isOpen ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 ml-8 mt-1">
+            <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
+          </p>
+          <p className="text-sm text-gray-500 ml-8 mt-1">
+             Submitted by: <span className="font-medium">{report.submitted_by}</span>
+          </p>
+        </div>
+
+        {/* Right: Duration and Status */}
+        <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
+          <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
+            <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
+            {report.duration} hours
+          </p>
+          <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
+            {report.status}
+          </span>
+        </div>
       </div>
 
-      {/* Right: Duration and Status */}
-      <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
-        <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
-          <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
-          {report.duration} hours
-        </p>
-        <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
-          {report.status}
-        </span>
-      </div>
+      {/* Children Reports Accordion */}
+      {isOpen && childrenReports.length > 0 && (
+        <div className="pl-6 sm:pl-10 space-y-2 border-l-2 border-indigo-100 ml-4">
+           {childrenReports.map(child => (
+             <ReportListItem 
+                key={child.id} 
+                report={child} 
+                onClick={() => onChildClick && onChildClick(child)} 
+             /> 
+           ))}
+        </div>
+      )}
     </div>
   );
+};
+
+// ====================================================================
+// --- GROUPING HELPERS ---
+// ====================================================================
+
+interface ReportGroup {
+  parent: Report;
+  children: Report[];
+}
+
+const groupReports = (reports: Report[]): ReportGroup[] => {
+  const groups: { [baseId: string]: Report[] } = {};
+  
+  reports.forEach(r => {
+    // Logic: Base ID is the part before the first hyphen? 
+    // Actually, "1234" is base. "1234-1" is child.
+    // Base ID of "1234" is "1234".
+    // Base ID of "1234-1" is "1234".
+    // We assume activity_id format is "BASE" or "BASE-SUFFIX".
+    const baseId = r.activity_id.split('-')[0];
+    if (!groups[baseId]) groups[baseId] = [];
+    groups[baseId].push(r);
+  });
+
+  const reportGroups: ReportGroup[] = [];
+  
+  Object.keys(groups).forEach(baseId => {
+    const list = groups[baseId];
+    // Find parent: exact match to baseId?
+    const parentIndex = list.findIndex(r => r.activity_id === baseId);
+    let parent: Report;
+    let children: Report[] = [];
+
+    if (parentIndex !== -1) {
+      parent = list[parentIndex];
+      children = list.filter((_, idx) => idx !== parentIndex);
+    } else {
+      // No exact parent match? (Maybe only 1234-1 exists).
+      // Treat the first one as parent (or grouped under virtual parent? No report must be real).
+      // Let's take the one with shortest ID? or just the first one.
+      // Sort by ID length then value.
+      list.sort((a, b) => a.activity_id.length - b.activity_id.length || a.activity_id.localeCompare(b.activity_id));
+      parent = list[0];
+      children = list.slice(1);
+    }
+    
+    // Sort children
+    children.sort((a, b) => a.activity_id.localeCompare(b.activity_id));
+    
+    reportGroups.push({ parent, children });
+  });
+
+  // Sort groups by parent date desc (or created_at)
+  reportGroups.sort((a, b) => new Date(b.parent.created_at).getTime() - new Date(a.parent.created_at).getTime());
+
+  return reportGroups;
+};
+
+const paginateGroups = (groups: ReportGroup[], page: number, limit: number) => {
+  return groups.slice((page - 1) * limit, page * limit);
 };
 
 // ====================================================================
@@ -913,54 +1106,23 @@ export default function ReportsListPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [activeTab, setActiveTab] = useState<'Ongoing' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
 
- const fetchReports = async () => {
-  setLoading(true);
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&order=created_at.desc`, { headers });
-    if (!res.ok) throw new Error("Failed to fetch");
-    const data: Report[] = await res.json();
-    
-    const grouped: { [key: string]: Report[] } = {};
-    
-    data.forEach(r => {
-      // Logic: Strip the suffix to find the Parent ID
-      // If activity_id is "1232-1", parentId becomes "1232"
-      const parentId = r.activity_id.split('-')[0];
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch all reports sorted by created_at desc
+      const res = await fetch(`${supabaseUrl}/rest/v1/reports?select=*&order=created_at.desc`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data: Report[] = await res.json();
       
-      if (!grouped[parentId]) grouped[parentId] = [];
-      grouped[parentId].push(r);
-    });
-
-    const uniqueActivityReports: Report[] = [];
-
-    Object.keys(grouped).forEach(parentId => {
-        const group = grouped[parentId];
-        
-        // Check status across the whole group
-        const hasPending = group.some(r => r.status === 'Pending' || r.status === 'Processing');
-        const hasStarted = group.some(r => r.status === 'Started');
-        
-        // Use the very first original report (usually the one without a dash) 
-        // as the display data, or the latest created one.
-        const latest = group[0];
-        
-        let displayStatus = latest.status;
-        if (hasPending) displayStatus = 'Pending';
-        else if (hasStarted) displayStatus = 'Ongoing';
-        else if (group.every(r => r.status === 'Approved')) displayStatus = 'Approved';
-        else if (group.every(r => r.status === 'Rejected')) displayStatus = 'Rejected';
-        
-        // Override the ID for display purposes so it always shows the Parent ID
-        uniqueActivityReports.push({ ...latest, activity_id: parentId, status: displayStatus });
-    });
-
-    setReports(uniqueActivityReports);
-  } catch (err) {
-    console.error(err);
-    toast.error("Failed to fetch reports");
-  }
-  setLoading(false);
-};
+      // Removed unique grouping logic to allow all reports (including suffixed ones) to be loaded.
+      // Grouping will be handled at the display level.
+      setReports(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch reports");
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchReports();
@@ -1005,8 +1167,8 @@ export default function ReportsListPage() {
     setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
   };
 
-  const startedReports = reports.filter(r => r.status === 'Ongoing');
-  const pendingReports = reports.filter(r => r.status === 'Pending');
+  const startedReports = reports.filter(r => r.status === 'Ongoing' || r.status === 'Started' || r.status === 'Assigned');
+  const pendingReports = reports.filter(r => r.status === 'Pending' || r.status === 'Processing');
   const approvedReports = reports.filter(r => r.status === 'Approved');
   const rejectedReports = reports.filter(r => r.status === 'Rejected');
 
@@ -1023,26 +1185,8 @@ export default function ReportsListPage() {
   useEffect(() => { setPageApproved(1); }, [approvedReports.length]);
   useEffect(() => { setPageRejected(1); }, [rejectedReports.length]);
 
-  // Paginated slices
-  const startedPaginated = startedReports.slice(
-    (pageStarted - 1) * itemsPerPage,
-    pageStarted * itemsPerPage
-  );
-
-  const pendingPaginated = pendingReports.slice(
-    (pagePending - 1) * itemsPerPage,
-    pagePending * itemsPerPage
-  );
-
-  const approvedPaginated = approvedReports.slice(
-    (pageApproved - 1) * itemsPerPage,
-    pageApproved * itemsPerPage
-  );
-
-  const rejectedPaginated = rejectedReports.slice(
-    (pageRejected - 1) * itemsPerPage,
-    pageRejected * itemsPerPage
-  );
+  // Paginated slices (Now handled dynamically via helpers in render to support grouping)
+  // Removed old flat pagination variables to prevent unused warnings.
 
   /* CSV Export Function */
   const exportToCSV = (data: Report[], filename: string) => {
@@ -1202,16 +1346,32 @@ export default function ReportsListPage() {
             <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-gray-100 min-h-[400px]">
               
               {activeTab === 'Ongoing' && (
-                <Section title="Ongoing Activity" color="#f59e0b" count={startedReports.length}>
-                  {startedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pageStarted} total={startedReports.length} itemsPerPage={itemsPerPage} onChange={setPageStarted} />
+                <Section title="Ongoing Activity" color="#f59e0b" count={groupReports(startedReports).length}>
+                  {paginateGroups(groupReports(startedReports), pageStarted, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pageStarted} total={groupReports(startedReports).length} itemsPerPage={itemsPerPage} onChange={setPageStarted} />
                 </Section>
               )}
 
               {activeTab === 'Pending' && (
-                <Section title="Pending Review" color="#f59e0b" count={pendingReports.length}>
-                  {pendingPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pagePending} total={pendingReports.length} itemsPerPage={itemsPerPage} onChange={setPagePending} />
+                <Section title="Pending Review" color="#f59e0b" count={groupReports(pendingReports).length}>
+                  {paginateGroups(groupReports(pendingReports), pagePending, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pagePending} total={groupReports(pendingReports).length} itemsPerPage={itemsPerPage} onChange={setPagePending} />
                 </Section>
               )}
 
@@ -1219,7 +1379,7 @@ export default function ReportsListPage() {
                 <Section
                   title="Approved Reports"
                   color="#10b981"
-                  count={approvedReports.length}
+                  count={groupReports(approvedReports).length}
                   onExport={() => {
                     const now = new Date();
                     const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
@@ -1227,15 +1387,31 @@ export default function ReportsListPage() {
                     exportToCSV(approvedReports, `approved_reports_${todayStr}.csv`);
                   }}
                 >
-                  {approvedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                  <PaginationPills page={pageApproved} total={approvedReports.length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
+                  {paginateGroups(groupReports(approvedReports), pageApproved, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                  ))}
+                  <PaginationPills page={pageApproved} total={groupReports(approvedReports).length} itemsPerPage={itemsPerPage} onChange={setPageApproved} />
                 </Section>
               )}
 
               {activeTab === 'Rejected' && (
-                 <Section title="Rejected Reports" color="#ef4444" count={rejectedReports.length}>
-                   {rejectedPaginated.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
-                   <PaginationPills page={pageRejected} total={rejectedReports.length} itemsPerPage={itemsPerPage} onChange={setPageRejected} />
+                 <Section title="Rejected Reports" color="#ef4444" count={groupReports(rejectedReports).length}>
+                   {paginateGroups(groupReports(rejectedReports), pageRejected, itemsPerPage).map(group => (
+                     <ReportListItem 
+                        key={group.parent.id} 
+                        report={group.parent} 
+                        onClick={() => handleReportClick(group.parent)}
+                        childrenReports={group.children}
+                        onChildClick={handleReportClick}
+                     />
+                   ))}
+                   <PaginationPills page={pageRejected} total={groupReports(rejectedReports).length} itemsPerPage={itemsPerPage} onChange={setPageRejected} />
                  </Section>
                )}
             </div>

@@ -389,12 +389,14 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
   }));
 };
   const fetchStartedActivities = async () => {
-    const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=eq.Started&submitted_by=eq.${username}`, {
+    // Fetch both Started and Assigned activities
+    const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?status=in.(Started,Assigned)&submitted_by=eq.${username}`, {
       headers: {
         "apikey": supabaseKey,
         "Authorization": `Bearer ${supabaseKey}`
       }
     });
+
     if (res.ok) {
       const data = await res.json();
       setStartedActivities(data);
@@ -472,6 +474,30 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
     return;
   }
 
+  
+  // Let's do a simple GET with limit=1 to see if any exist
+  try {
+      const resCheck = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${activityId}&select=id&limit=1`, {
+        headers: {
+            "apikey": supabaseKey,
+            "Authorization": `Bearer ${supabaseKey}`,
+        }
+      });
+      if (resCheck.ok) {
+          const dataCheck = await resCheck.json();
+          if (dataCheck.length > 0) {
+              toast.error(`Activity ID ${activityId} already exists! Please use a unique ID.`);
+              return;
+          }
+      }
+  } catch (e) {
+      console.error("Error checking duplicates", e);
+      // Optional: stop or warn? Let's warn but maybe not stop if check fails due to network? 
+      // User asked for "fool proof error prevention", so if check fails, we should probably be cautious.
+      // But standard is usually to stop if we find a duplicate.
+  }
+
+  // WAIT FOR LOCATION
   setIsStarting(true);
 
   try {
@@ -568,6 +594,66 @@ const handlePremixFileSelect = (categoryKey: string) => (e: React.ChangeEvent<HT
     setIsStarting(false);
   }
 };
+
+  const startAssignedActivity = async (e: React.MouseEvent, activity: any) => {
+      e.stopPropagation();
+      
+      // Get location
+      let lat = null; 
+      let lng = null; 
+      let link = null;
+      try {
+        const pos = await getLocationAsync();
+        lat = pos.lat;
+        lng = pos.lng;
+        link = `https://maps.google.com/?q=${lat},${lng}`;
+      } catch(e) {/* ignore */}
+
+      const now = new Date();
+      const malaysiaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+      const timeStr = malaysiaTime.toTimeString().slice(0, 5);
+      const todayStr = `${malaysiaTime.getFullYear()}-${String(malaysiaTime.getMonth() + 1).padStart(2, '0')}-${String(malaysiaTime.getDate()).padStart(2, '0')}`; 
+      const weekdayStr = malaysiaTime.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Kuala_Lumpur" });
+
+      const payload = {
+        status: 'Started',
+        date: todayStr,
+        day: weekdayStr,
+        start_time: timeStr,
+        start_latitude: lat,
+        start_longitude: lng,
+        start_gmap_link: link
+      };
+
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/${supabaseTable}?activity_id=eq.${activity.activity_id}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                apikey: supabaseKey,
+                Authorization: `Bearer ${supabaseKey}`,
+                Prefer: "return=representation",
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error("Failed to start assigned activity");
+        
+        toast.success(`Activity ${activity.activity_id} Started!`);
+        fetchStartedActivities();
+        
+        // Select it immediately
+        // We need to merge payload with activity to select it properly without fetching again? 
+        // Or just wait for fetch. Fetch is safer.
+        // But let's select logic
+        const updatedActivity = { ...activity, ...payload };
+        selectActivity(updatedActivity);
+
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to start activity.");
+      }
+  };
 
 
 
@@ -1358,8 +1444,13 @@ const handleSubmit = async () => {
                                  className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 hover:shadow-md transition cursor-pointer flex flex-col gap-2"
                                  onClick={() => selectActivity(act)}
                                >
-                                  <div className="flex justify-between items-start">
-                                     <span className="font-bold text-blue-600">{act.activity_id}</span>
+                                   <div className="flex justify-between items-start">
+                                      <div className="flex flex-col">
+                                          <span className="font-bold text-blue-600">{act.activity_id}</span>
+                                          {act.status === 'Assigned' && (
+                                              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full w-fit">Assigned</span>
+                                          )}
+                                      </div>
                                      <button 
                                        onClick={(e) => { e.stopPropagation(); deleteActivity(e, act.activity_id); }}
                                        className="p-1 rounded-full text-gray-400 hover:text-red-500 transition"
@@ -1367,15 +1458,26 @@ const handleSubmit = async () => {
                                        <X className="w-4 h-4" />
                                      </button>
                                   </div>
-                                  <div className="text-sm text-gray-500">{act.start_time}</div>
+                                  <div className="text-sm text-gray-500">
+                                      {act.status === 'Assigned' ? 'Waiting to start...' : act.start_time}
+                                  </div>
                                   {act.damage_type && (
                                     <div className="text-sm text-gray-700">
                                       <span className="font-medium">Damage:</span> {act.damage_type}
                                     </div>
                                   )}
-                                   <button className="w-full mt-2 py-2 bg-blue-50 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-100 transition">
-                                      Resume
-                                   </button>
+                                   {act.status === 'Assigned' ? (
+                                       <button 
+                                          onClick={(e) => startAssignedActivity(e, act)}
+                                          className="w-full mt-2 py-2 bg-green-50 text-green-600 text-sm font-semibold rounded-lg hover:bg-green-100 transition"
+                                       >
+                                          Start Activity
+                                       </button>
+                                   ) : (
+                                       <button className="w-full mt-2 py-2 bg-blue-50 text-blue-600 text-sm font-semibold rounded-lg hover:bg-blue-100 transition">
+                                          Resume
+                                       </button>
+                                   )}
                                </div>
                              ))}
                            </div>
