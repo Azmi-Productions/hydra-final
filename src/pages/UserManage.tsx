@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Trash2, Loader2, UserPlus, Calendar, Fingerprint } from "lucide-react";
 import toast from "../utils/toast";
+import { getCookieUsername } from "../utils/auth";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const TABLE_NAME = "adiav";
@@ -28,12 +29,7 @@ const getRoleBadgeClass = (role: string) => {
   }
 };
 
-// Helper: Get current username from cookie
-const getCookieUsername = () => {
-    const match = document.cookie.match(new RegExp('(^| )username=([^;]+)'));
-    if (match) return match[2];
-    return null;
-};
+// Utility to get a color based on the role for the badge
 
 // --- Sub-Component for Mobile (Card View) ---
 interface UserCardListProps {
@@ -291,9 +287,7 @@ export default function UserManagementPage() {
                 Manage user accounts, roles, and access permissions.
               </p>
             </div>
-            <div className="text-right text-sm text-gray-400">
-               Logged in as: <span className="font-bold text-gray-600">{getCookieUsername() || "Unknown"}</span>
-            </div>
+            
           </div>
         </header>
         {/* Add User Card */}

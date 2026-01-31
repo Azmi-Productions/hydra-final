@@ -1,5 +1,5 @@
 import { useEffect, useState, MouseEventHandler, useCallback } from "react";
-import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, Edit3, Loader2,Play} from 'lucide-react';
+import { MapPin, Calendar, Hash, Layers, X, FolderOpen, Loader, Clock, Edit3, Loader2,Play, ChevronUp, ChevronDown} from 'lucide-react';
 import toast from "../utils/toast";
 import DimensionInput, { Dimensions } from '../components/DimensionInput';
 
@@ -251,8 +251,8 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
                         <p className="text-gray-800 font-medium">{report.start_time} - {report.end_time}</p>
                       </div>
                       <div>
-                        <label className={labelStyle}>Duration (hrs)</label>
-                        <p className="text-gray-800 font-medium">{report.duration} hrs</p>
+                        <label className={labelStyle}>Duration (mins)</label>
+                        <p className="text-gray-800 font-medium">{report.duration} mins</p>
                       </div>
                     </div>
 
@@ -502,52 +502,139 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps & { onUpda
 interface ListItemProps {
   report: Report;
   onClick: MouseEventHandler<HTMLDivElement>;
+  childrenReports?: Report[];
+  onChildClick?: (r: Report) => void;
 }
 
-const ReportListItem = ({ report, onClick }: ListItemProps) => {
+const ReportListItem = ({ report, onClick, childrenReports = [], onChildClick }: ListItemProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+
   // Status badge style
   const getStatusBadge = (status: string) => {
     if (status === 'Approved') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-green-500 text-white";
     if (status === 'Pending') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-yellow-500 text-white";
     if (status === 'Started') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-blue-500 text-white";
+     if (status === 'Ongoing') return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-blue-500 text-white";
     return "inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md bg-gray-500 text-white";
   };
 
   return (
-    <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer
-                    hover:shadow-2xl hover:border-indigo-400 transition duration-300
-                    transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4"
-      onClick={onClick}
-    >
-      {/* Left: ID, Date, Type */}
-      <div className="w-full">
-        <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
-          <MapPin className="w-5 h-5 mr-3 text-indigo-500" />
-          {report.activity_id}
-        </h3>
-        <div className="text-sm text-gray-500 ml-8 mt-1">
-          <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
-           <p className="text-sm text-gray-500 mt-1">
-             Submitted by: <span className="font-medium">{report.submitted_by}</span>
-           </p>
+    <div className="flex flex-col space-y-2">
+      <div className="bg-white shadow-lg rounded-xl p-5 border border-gray-100 cursor-pointer
+                      hover:shadow-2xl hover:border-indigo-400 transition duration-300
+                      transform hover:-translate-y-1 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 relative"
+        onClick={onClick}
+      >
+        {/* Left: ID, Date, Type */}
+        <div className="w-full">
+           <div className="flex items-center gap-2">
+            <h3 className="text-xl font-extrabold text-gray-800 flex items-center">
+              <MapPin className="w-5 h-5 mr-3 text-indigo-500" />
+              {report.activity_id}
+            </h3>
+            {childrenReports.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                className="p-1 rounded-full hover:bg-gray-100 transition"
+                title={`${childrenReports.length} related reports`}
+              >
+                {isOpen ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+              </button>
+            )}
+          </div>
+          <div className="text-sm text-gray-500 ml-8 mt-1">
+            <span className="font-semibold">{report.date}</span> &bull; {report.damage_type}
+             <p className="text-sm text-gray-500 mt-1">
+               Submitted by: <span className="font-medium">{report.submitted_by}</span>
+             </p>
+          </div>
+        </div>
+
+        {/* Right: Duration and Status */}
+        <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
+          <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
+            <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
+            {report.duration} mins
+          </p>
+          <span className={`${getStatusBadge(report.status)} order-2 sm:order-none`}>
+            {report.status}
+          </span>
         </div>
       </div>
 
-      {/* Right: Duration and Status */}
-      <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
-        <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
-          <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
-          {report.duration} hours
-        </p>
-        <span className={`${getStatusBadge(report.status)} order-2 sm:order-none`}>
-          {report.status}
-        </span>
-      </div>
+       {/* Children Reports Accordion */}
+      {isOpen && childrenReports.length > 0 && (
+        <div className="pl-6 sm:pl-10 space-y-2 border-l-2 border-indigo-100 ml-4">
+           {childrenReports.map(child => (
+             <ReportListItem
+                key={child.id}
+                report={child}
+                onClick={() => onChildClick && onChildClick(child)}
+             />
+           ))}
+        </div>
+      )}
     </div>
   );
 };
 
 
+// ====================================================================
+// --- GROUPING HELPERS ---
+// ====================================================================
+
+interface ReportGroup {
+  parent: Report;
+  children: Report[];
+}
+
+const groupReports = (reports: Report[]): ReportGroup[] => {
+  const groups: { [baseId: string]: Report[] } = {};
+
+  reports.forEach(r => {
+    // Logic: Base ID is the part before the first hyphen?
+    // Actually, "1234" is base. "1234-1" is child.
+    // Base ID of "1234" is "1234".
+    // Base ID of "1234-1" is "1234".
+    // We assume activity_id format is "BASE" or "BASE-SUFFIX".
+    const baseId = r.activity_id.split('-')[0];
+    if (!groups[baseId]) groups[baseId] = [];
+    groups[baseId].push(r);
+  });
+
+  const reportGroups: ReportGroup[] = [];
+
+  Object.keys(groups).forEach(baseId => {
+    const list = groups[baseId];
+    // Find parent: exact match to baseId?
+    const parentIndex = list.findIndex(r => r.activity_id === baseId);
+    let parent: Report;
+    let children: Report[] = [];
+
+    if (parentIndex !== -1) {
+      parent = list[parentIndex];
+      children = list.filter((_, idx) => idx !== parentIndex);
+    } else {
+      // No exact parent match? (Maybe only 1234-1 exists).
+      // Treat the first one as parent (or grouped under virtual parent? No report must be real).
+      // Let's take the one with shortest ID? or just the first one.
+      // Sort by ID length then value.
+      list.sort((a, b) => a.activity_id.length - b.activity_id.length || a.activity_id.localeCompare(b.activity_id));
+      parent = list[0];
+      children = list.slice(1);
+    }
+
+    // Sort children
+    children.sort((a, b) => a.activity_id.localeCompare(b.activity_id));
+
+    reportGroups.push({ parent, children });
+  });
+
+  // Sort groups by parent date desc (or created_at)
+  reportGroups.sort((a, b) => new Date(b.parent.created_at).getTime() - new Date(a.parent.created_at).getTime());
+
+  return reportGroups;
+};
 
 // ====================================================================
 // --- 3. ApprovedReportsPage Component (Main) ---
@@ -682,7 +769,15 @@ export default function ApprovedReportsPage() {
                     <p className="text-gray-500 italic">No ongoing activities.</p>
                  ) : (
                   <div className="space-y-4">
-                    {startedReports.map(r => <ReportListItem key={r.id} report={{...r, status: 'Ongoing'}} onClick={() => handleReportClick(r)} />)}
+                    {groupReports(startedReports).map(group => (
+                       <ReportListItem
+                          key={group.parent.id}
+                          report={group.parent}
+                          onClick={() => handleReportClick(group.parent)}
+                          childrenReports={group.children}
+                          onChildClick={handleReportClick}
+                       />
+                    ))}
                   </div>
                  )}
               </div>
@@ -695,7 +790,15 @@ export default function ApprovedReportsPage() {
                     <p className="text-gray-500 italic">No pending reports.</p>
                  ) : (
                   <div className="space-y-4">
-                    {pendingReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                     {groupReports(pendingReports).map(group => (
+                       <ReportListItem
+                          key={group.parent.id}
+                          report={group.parent}
+                          onClick={() => handleReportClick(group.parent)}
+                          childrenReports={group.children}
+                          onChildClick={handleReportClick}
+                       />
+                    ))}
                   </div>
                  )}
               </div>
@@ -708,7 +811,15 @@ export default function ApprovedReportsPage() {
                     <p className="text-gray-500 italic">No approved reports.</p>
                  ) : (
                   <div className="space-y-4">
-                    {approvedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                     {groupReports(approvedReports).map(group => (
+                       <ReportListItem
+                          key={group.parent.id}
+                          report={group.parent}
+                          onClick={() => handleReportClick(group.parent)}
+                          childrenReports={group.children}
+                          onChildClick={handleReportClick}
+                       />
+                    ))}
                   </div>
                  )}
               </div>
@@ -721,7 +832,15 @@ export default function ApprovedReportsPage() {
                     <p className="text-gray-500 italic">No rejected reports.</p>
                  ) : (
                   <div className="space-y-4">
-                    {rejectedReports.map(r => <ReportListItem key={r.id} report={r} onClick={() => handleReportClick(r)} />)}
+                     {groupReports(rejectedReports).map(group => (
+                       <ReportListItem
+                          key={group.parent.id}
+                          report={group.parent}
+                          onClick={() => handleReportClick(group.parent)}
+                          childrenReports={group.children}
+                          onChildClick={handleReportClick}
+                       />
+                    ))}
                   </div>
                  )}
               </div>

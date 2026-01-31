@@ -614,8 +614,8 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
                 <p className="text-gray-800 font-medium">{editableReport.start_time} - {editableReport.end_time}</p>
               </div>
               <div>
-                <label className={labelStyle}>Duration (hrs)</label>
-                <p className="text-gray-800 font-medium">{editableReport.duration} hrs</p>
+                <label className={labelStyle}>Duration (mins)</label>
+                <p className="text-gray-800 font-medium">{editableReport.duration} mins</p>
               </div>
             </div>
             
@@ -957,7 +957,7 @@ const ReportListItem = ({ report, onClick, childrenReports = [], onChildClick }:
         <div className="w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 sm:gap-1 mt-2 sm:mt-0">
           <p className="text-base font-medium text-gray-600 order-1 sm:order-none">
             <span className="block text-xs font-normal text-gray-400 text-left sm:text-right">Duration</span>
-            {report.duration} hours
+            {report.duration} mins
           </p>
           <span className={`inline-block px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full shadow-md order-2 sm:order-none ${statusColor}`}>
             {report.status}
@@ -1197,7 +1197,7 @@ export default function ReportsListPage() {
 
     // Define columns
     const headers = [
-      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (hrs)",
+      "ID", "Activity ID", "Date", "Day", "Start Time", "End Time", "Duration (mins)",
       "Damage Type", "Equipment Used", "Manpower Involved", "Excavation (m3)",
       "Sand (m3)", "Aggregate (m3)", "Premix (kg)", "Cement (kg)", "Pipe Usage (m)", "Fittings",
       "Remarks", "Start Lat", "Start Long", "End Lat", "End Long", "Status", "Submitted By"
