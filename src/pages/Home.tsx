@@ -658,6 +658,16 @@ export default function Dashboard() {
                           >
                             hours
                           </span>
+                          <span
+                             style={{
+                               fontSize: typography.fontSize.sm,
+                               color: colors.neutral.gray400, // Slightly lighter
+                               marginLeft: spacing[2],
+                               fontStyle: 'italic'
+                             }}
+                          >
+                             ({Math.round(hours * 60)} mins)
+                          </span>
                         </div>
                       </div>
                     ))}

@@ -11,6 +11,7 @@ import { Toaster } from "react-hot-toast";
 import DeviceStatusPage from "./pages/Devices.tsx";
 import Dashboard from "./pages/Home.tsx";
 import LocationHistoryPage from "./pages/LocationHistory.tsx";
+import { getCookieUsername } from "./utils/auth";
 
 
 function AppWrapper() {
@@ -24,6 +25,20 @@ function AppWrapper() {
 
       {/* Main Content */}
       <div className="flex-1">
+        {/* Global User Header - Hidden on public pages if desired, but request was "every page". 
+            However, usually we don't show it on Login. 
+            The USER request was "on every page add who they are logged in as".
+            Since !hideSidebar checks for Login path, we can reuse that or check again if we want to support it on Login (which doesn't make sense if not logged in).
+            Let's assume "every page" implies pages where you ARE logged in. 
+            Actually, the screenshot shows it's inside the main layout. 
+            Let's place it at the top of the flex-1 div. */ }
+         {!hideSidebar && (
+            <div className="flex justify-end p-4 bg-transparent">
+              <span className="text-gray-500">
+                Logged in as: <span className="font-bold text-gray-800">{getCookieUsername() || "Unknown"}</span>
+              </span>
+            </div>
+         )}
         <Routes>
           {/* Public Login */}
           <Route path="/" element={<Login />} />

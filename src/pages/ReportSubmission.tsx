@@ -1224,14 +1224,14 @@ const handleSubmit = async () => {
       startDateTime.setDate(startDateTime.getDate() - 1);
     }
 
-    let diffHours = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60 * 60);
+    let diffMinutes = (malaysiaNow.getTime() - startDateTime.getTime()) / (1000 * 60);
 
-    // Enforce minimum duration of 0.05 hours (3 mins)
-    if (isNaN(diffHours) || diffHours < 0.05) {
-      diffHours = 0.05;
+    // Enforce minimum duration of 3 minutes
+    if (isNaN(diffMinutes) || diffMinutes < 3) {
+      diffMinutes = 3;
     }
 
-    const finalDurationStr = diffHours.toFixed(2);
+    const finalDurationStr = diffMinutes.toFixed(0);
 
     const malaysiaEndTime = malaysiaNow.toTimeString().slice(0, 5);
     setEndTime(malaysiaEndTime);
@@ -1424,7 +1424,7 @@ const handleSubmit = async () => {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <FormInput label="Day" placeholder="Auto-calculated" value={day ?? ""} readOnly />
-                            <FormInput label="Duration (Hours)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
+                            <FormInput label="Duration (Minutes)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                           </div>
                           <hr className="border-gray-100 pt-3" />
                           <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
