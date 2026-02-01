@@ -493,11 +493,11 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto transform transition duration-300">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto overflow-x-hidden transform transition duration-300">
         
         {/* Header */}
         {/* Header */}
-        <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center z-10">
+        <div className="sticky top-0 bg-white p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center z-10">
           <div>
             <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
                 <FolderOpen className="w-6 h-6 mr-3 text-indigo-600" />
@@ -578,7 +578,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         {loading ? (
             <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-indigo-500 w-8 h-8"/></div>
         ) : (
-        <div className="p-8 space-y-8">
+        <div className="p-4 sm:p-6 md:p-8 space-y-8">
           
           {/* Status Badge & Tabs */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
