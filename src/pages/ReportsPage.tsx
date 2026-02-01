@@ -407,8 +407,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
       if (!res.ok) throw new Error("Failed to update report");
 
+      const data = await res.json();
       toast.success("Changes saved successfully!");
-      fetchActivityReports(); // Refresh tabs data
+      
+      if (data && data.length > 0) {
+        onUpdate(data[0]);
+      }
+      onClose();
 
     } catch (err) {
       console.error(err);
@@ -432,9 +437,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
       if (!res.ok) throw new Error("Failed to update status");
       
+      const data = await res.json();
       toast.success(`Report ${status} successfully!`);
-      // Update local state without full reload if possible, but fetching is safer
-      fetchActivityReports(); 
+      
+      if (data && data.length > 0) {
+        onUpdate(data[0]);
+      }
+      onClose();
 
     } catch (err) {
       console.error(err);
