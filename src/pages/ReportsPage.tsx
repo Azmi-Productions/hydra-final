@@ -92,6 +92,19 @@ const PREMIX_CATEGORIES = [
   { key: 'label_premix', label: 'gambar label premix / Premix Label Picture' },
 ];
 
+const PREDEFINED_DAMAGE_TYPES = [
+  "Pipe Leak / Paip Bocor",
+  "Low Pressure",
+  "Meter Stand Leak",
+  "GI Pipe / Meter Rusty & Blocked",
+  "Ferrule Leak / Ferrule Bocor",
+  "Elbow Leak",
+  "Valve / Stopcock Issue",
+  "Finishing Works / Kemasan",
+  "Hydrant Leak",
+  
+];
+
 // ====================================================================
 // --- 1. ReportDetailsModal Component ---
 // ====================================================================
@@ -630,12 +643,41 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             
             <div className="mt-6">
               <label className={labelStyle}>Damage Type</label>
-              <input 
-                type="text" 
-                value={editableReport.damage_type} 
-                onChange={(e) => handleChange("damage_type", e.target.value)} 
+              <select
+                value={
+                  editableReport.damage_type === "" ? "" :
+                  PREDEFINED_DAMAGE_TYPES.includes(editableReport.damage_type) ? editableReport.damage_type : 
+                  "other"
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "other") {
+                    handleChange("damage_type", "Other (specify): ");
+                  } else {
+                    handleChange("damage_type", val);
+                  }
+                }}
                 className={inputStyle}
-              />
+              >
+                <option value="" disabled>Select Damage Type</option>
+                {PREDEFINED_DAMAGE_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+                <option value="other">other</option>
+              </select>
+              
+              {editableReport.damage_type !== "" && !PREDEFINED_DAMAGE_TYPES.includes(editableReport.damage_type) && (
+                <input 
+                  type="text" 
+                  value={editableReport.damage_type === "Other (specify): " ? "" : editableReport.damage_type} 
+                  onChange={(e) => {
+                    handleChange("damage_type", e.target.value === "" ? "Other (specify): " : e.target.value);
+                  }} 
+                  placeholder="Specify other damage type"
+                  className={`${inputStyle} mt-2`}
+                  autoFocus
+                />
+              )}
             </div>
             <p className="mt-4 text-sm text-gray-600 flex items-center">
               <MapPin className="w-4 h-4 mr-1 text-red-500" />
