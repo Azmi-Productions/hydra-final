@@ -42,6 +42,20 @@ const PREMIX_CATEGORIES = [
   { key: 'ukuran_premix', label: 'Gambar Ukuran Premix / Premix Size Picture' },
   { key: 'label_premix', label: 'Gambar Label Premix / Premix Label Picture' },
 ];
+
+const PREDEFINED_DAMAGE_TYPES = [
+  "Pipe Leak / Paip Bocor",
+  "Low Pressure",
+  "Meter Stand Leak",
+  "GI Pipe / Meter Rusty & Blocked",
+  "Ferrule Leak / Ferrule Bocor",
+  "Elbow Leak",
+  "Valve / Stopcock Issue",
+  "Finishing Works / Kemasan",
+  "Hydrant Leak",
+  "Unknown"
+];
+
 //old hydra
 // --- Supabase REST API ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -1427,7 +1441,44 @@ const handleSubmit = async () => {
                             <FormInput label="Duration (Minutes)" placeholder="Auto-calculated" value={duration ?? ""} readOnly />
                           </div>
                           <hr className="border-gray-100 pt-3" />
-                          <FormInput label="Jenis Kerosakan /  Damage Type" placeholder="e.g., Burst Pipe" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+                          <div className="relative">
+                            <label className="text-sm font-medium text-gray-600 mb-1 block">Jenis Kerosakan / Damage Type</label>
+                            <select
+                              value={
+                                damageType === "" ? "" :
+                                PREDEFINED_DAMAGE_TYPES.includes(damageType) ? damageType : 
+                                "other"
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "other") {
+                                  setDamageType("Other (specify): ");
+                                } else {
+                                  setDamageType(val);
+                                }
+                              }}
+                              className="w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                            >
+                              <option value="" disabled>Select Damage Type</option>
+                              {PREDEFINED_DAMAGE_TYPES.map((type) => (
+                                <option key={type} value={type}>{type}</option>
+                              ))}
+                              <option value="other">other</option>
+                            </select>
+                            
+                            {damageType !== "" && !PREDEFINED_DAMAGE_TYPES.includes(damageType) && (
+                              <input 
+                                type="text" 
+                                value={damageType === "Other (specify): " ? "" : damageType} 
+                                onChange={(e) => {
+                                  setDamageType(e.target.value === "" ? "Other (specify): " : e.target.value);
+                                }} 
+                                placeholder="Please specify other damage type"
+                                className="w-full p-3 border border-gray-300 rounded-xl bg-white text-gray-800 transition duration-150 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 mt-3"
+                                autoFocus
+                              />
+                            )}
+                          </div>
                         </div>
                       )}
                   </div>

@@ -92,6 +92,19 @@ const PREMIX_CATEGORIES = [
   { key: 'label_premix', label: 'gambar label premix / Premix Label Picture' },
 ];
 
+const PREDEFINED_DAMAGE_TYPES = [
+  "Pipe Leak / Paip Bocor",
+  "Low Pressure",
+  "Meter Stand Leak",
+  "GI Pipe / Meter Rusty & Blocked",
+  "Ferrule Leak / Ferrule Bocor",
+  "Elbow Leak",
+  "Valve / Stopcock Issue",
+  "Finishing Works / Kemasan",
+  "Hydrant Leak",
+  
+];
+
 // ====================================================================
 // --- 1. ReportDetailsModal Component ---
 // ====================================================================
@@ -405,8 +418,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
       if (!res.ok) throw new Error("Failed to update report");
 
+      const data = await res.json();
       toast.success("Changes saved successfully!");
-      fetchActivityReports(); // Refresh tabs data
+      
+      if (data && data.length > 0) {
+        onUpdate(data[0]);
+      }
+      onClose();
 
     } catch (err) {
       console.error(err);
@@ -430,9 +448,13 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
       if (!res.ok) throw new Error("Failed to update status");
       
+      const data = await res.json();
       toast.success(`Report ${status} successfully!`);
-      // Update local state without full reload if possible, but fetching is safer
-      fetchActivityReports(); 
+      
+      if (data && data.length > 0) {
+        onUpdate(data[0]);
+      }
+      onClose();
 
     } catch (err) {
       console.error(err);
@@ -482,11 +504,11 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto transform transition duration-300">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] overflow-y-auto overflow-x-hidden transform transition duration-300">
         
         {/* Header */}
         {/* Header */}
-        <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center z-10">
+        <div className="sticky top-0 bg-white p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center z-10">
           <div>
             <h2 className="text-2xl font-extrabold text-gray-900 flex items-center">
                 <FolderOpen className="w-6 h-6 mr-3 text-indigo-600" />
@@ -567,7 +589,7 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
         {loading ? (
             <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-indigo-500 w-8 h-8"/></div>
         ) : (
-        <div className="p-8 space-y-8">
+        <div className="p-4 sm:p-6 md:p-8 space-y-8">
           
           {/* Status Badge & Tabs */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -619,12 +641,41 @@ const ReportDetailsModal = ({ report, onClose, onUpdate }: ModalProps) => {
             
             <div className="mt-6">
               <label className={labelStyle}>Damage Type</label>
-              <input 
-                type="text" 
-                value={editableReport.damage_type} 
-                onChange={(e) => handleChange("damage_type", e.target.value)} 
+              <select
+                value={
+                  editableReport.damage_type === "" ? "" :
+                  PREDEFINED_DAMAGE_TYPES.includes(editableReport.damage_type) ? editableReport.damage_type : 
+                  "other"
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "other") {
+                    handleChange("damage_type", "Other (specify): ");
+                  } else {
+                    handleChange("damage_type", val);
+                  }
+                }}
                 className={inputStyle}
-              />
+              >
+                <option value="" disabled>Select Damage Type</option>
+                {PREDEFINED_DAMAGE_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+                <option value="other">other</option>
+              </select>
+              
+              {editableReport.damage_type !== "" && !PREDEFINED_DAMAGE_TYPES.includes(editableReport.damage_type) && (
+                <input 
+                  type="text" 
+                  value={editableReport.damage_type === "Other (specify): " ? "" : editableReport.damage_type} 
+                  onChange={(e) => {
+                    handleChange("damage_type", e.target.value === "" ? "Other (specify): " : e.target.value);
+                  }} 
+                  placeholder="Specify other damage type"
+                  className={`${inputStyle} mt-2`}
+                  autoFocus
+                />
+              )}
             </div>
             <p className="mt-4 text-sm text-gray-600 flex items-center">
               <MapPin className="w-4 h-4 mr-1 text-red-500" />

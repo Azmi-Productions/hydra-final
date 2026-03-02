@@ -76,6 +76,19 @@ const BOLD_COLORS = {
   background: "#F8FAFC", // Slate-50
 };
 
+const PREDEFINED_DAMAGE_TYPES = [
+  "Pipe Leak / Paip Bocor",
+  "Low Pressure",
+  "Meter Stand Leak",
+  "GI Pipe / Meter Rusty & Blocked",
+  "Ferrule Leak / Ferrule Bocor",
+  "Elbow Leak",
+  "Valve / Stopcock Issue",
+  "Finishing Works / Kemasan",
+  "Hydrant Leak",
+  "Unknown"
+];
+
 const CHART_COLORS = [
   BOLD_COLORS.primary,
   BOLD_COLORS.secondary,
@@ -83,7 +96,18 @@ const CHART_COLORS = [
   BOLD_COLORS.accent,
   "#06B6D4", // Cyan-500
   "#A855F7", // Violet-500
+  "#EC4899", // Pink-500
+  "#14B8A6", // Teal-500
+  "#F97316", // Orange-500
+  "#8B5CF6", // Purple-500
+  "#EF4444", // Red-500
+  "#3B82F6", // Blue-500
 ];
+
+// Helper to assign consistent colors to predefined types
+const getColorForIndex = (index: number) => {
+  return CHART_COLORS[index % CHART_COLORS.length];
+};
 
 /**
  * Custom Tooltip component for Recharts
@@ -153,10 +177,18 @@ export default function Dashboard() {
   // Damage type count
   const damageTypeData = Object.entries(
     reports.reduce((acc: Record<string, number>, r) => {
-      acc[r.damage_type] = (acc[r.damage_type] || 0) + 1;
+      let dt = r.damage_type || "Unknown";
+      
+      if (!PREDEFINED_DAMAGE_TYPES.includes(dt)) {
+        dt = "others";
+      }
+      
+      acc[dt] = (acc[dt] || 0) + 1;
       return acc;
     }, {})
-  ).map(([name, value]) => ({ name, value }));
+  )
+  .map(([name, value]) => ({ name, value }))
+  .sort((a, b) => b.value - a.value); // Sort by most frequent first
 
   // Material usage totals
   const materialData = [
@@ -414,7 +446,7 @@ export default function Dashboard() {
                 >
                   Damage Types
                 </h3>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={380}>
                   <PieChart>
                     <Pie
                       data={damageTypeData}
@@ -428,7 +460,7 @@ export default function Dashboard() {
                       {damageTypeData.map((_, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={CHART_COLORS[index % CHART_COLORS.length]}
+                          fill={getColorForIndex(index)}
                         />
                       ))}
                     </Pie>
@@ -461,7 +493,7 @@ export default function Dashboard() {
                 >
                   Report Status
                 </h3>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={380}>
                   <PieChart>
                     <Pie
                       data={statusData}
