@@ -190,14 +190,46 @@ export default function Dashboard() {
   .map(([name, value]) => ({ name, value }))
   .sort((a, b) => b.value - a.value); // Sort by most frequent first
 
-  // Material usage totals
+  // Helper to safely parse material data which might be an object containing dimensions
+  const parseVolume = (value: any): number => {
+    if (!value) return 0;
+    
+    // If it's a number, just return the number
+    const num = Number(value);
+    if (!isNaN(num)) return num;
+
+    // If it's a JSON object string from Supabase or straight object
+    try {
+      const obj = typeof value === 'string' ? JSON.parse(value) : value;
+      if (obj && typeof obj === 'object') {
+        const d = Number(obj.depth);
+        const w = Number(obj.width);
+        const l = Number(obj.length);
+        
+        let total = 1;
+        let hasDimension = false;
+
+        if (!isNaN(d) && d > 0) { total *= d; hasDimension = true; }
+        if (!isNaN(w) && w > 0) { total *= w; hasDimension = true; }
+        if (!isNaN(l) && l > 0) { total *= l; hasDimension = true; }
+        
+        if (hasDimension) return total;
+      }
+    } catch (e) {
+      // Ignored
+    }
+
+    return 0;
+  };
+
+  // Material usage totals calculated using dimensions where necessary
   const materialData = [
-    { name: "Excavation", value: reports.reduce((acc, r) => acc + (r.excavation ?? 0), 0) },
-    { name: "Sand", value: reports.reduce((acc, r) => acc + (r.sand ?? 0), 0) },
-    { name: "Aggregate", value: reports.reduce((acc, r) => acc + (r.aggregate ?? 0), 0) },
-    { name: "Premix", value: reports.reduce((acc, r) => acc + (r.premix ?? 0), 0) },
-    { name: "Cement", value: reports.reduce((acc, r) => acc + (r.cement ?? 0), 0) },
-    { name: "Pipe", value: reports.reduce((acc, r) => acc + (r.pipe_usage ?? 0), 0) },
+    { name: "Excavation", value: reports.reduce((acc, r) => acc + parseVolume(r.excavation), 0) },
+    { name: "Sand", value: reports.reduce((acc, r) => acc + parseVolume(r.sand), 0) },
+    { name: "Aggregate", value: reports.reduce((acc, r) => acc + parseVolume(r.aggregate), 0) },
+    { name: "Premix", value: reports.reduce((acc, r) => acc + parseVolume(r.premix), 0) },
+    { name: "Cement", value: reports.reduce((acc, r) => acc + parseVolume(r.cement), 0) },
+    { name: "Pipe", value: reports.reduce((acc, r) => acc + parseVolume(r.pipe_usage), 0) },
   ];
 
   // Status distribution
